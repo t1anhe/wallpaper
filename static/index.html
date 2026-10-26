@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Wallpaper</title>
+  <style>
+    html, body { margin: 0; background: #111; }
+    canvas { display: block; max-width: 100vw; max-height: 100vh; margin: auto; }
+  </style>
+  <script src="../lib/common.js"></script>
+  <script src="aurora.js"></script>
+  <script src="dunes.js"></script>
+  <script src="bauhaus.js"></script>
+  <script src="topography.js"></script>
+  <script src="silk.js"></script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <script>
+    // Usage: index.html?piece=aurora&w=3840&h=2160
+    function render(piece, w, h) {
+      const canvas = document.getElementById('c');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const wp = WALLPAPERS[piece];
+      wp.draw(ctx, w, h, mulberry32(wp.seed));
+      return canvas.toDataURL('image/jpeg', 0.93);
+    }
+    const q = new URLSearchParams(location.search);
+    if (q.get('piece')) {
+      render(q.get('piece'), +q.get('w') || 3840, +q.get('h') || 2160);
+    }
+  </script>
+</body>
+</html>

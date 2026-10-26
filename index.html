@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wallpapers</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; padding: 32px 16px 64px; background: #0d0d0e; color: #e8dfd2;
+      font: 15px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+    main { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+    p { color: #9c9389; margin: 0 0 24px; }
+    h2 { font-size: 14px; color: #c9573f; margin: 40px 0 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+    .card { background: #161617; border: 1px solid #262628; border-radius: 10px; overflow: hidden; }
+    .card iframe, .card img { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; object-fit: cover; pointer-events: none; }
+    .meta { padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+    .meta b { font-weight: 600; margin-right: auto; }
+    a { color: #e8b04b; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>wallpaper/</h1>
+    <p>动态像素壁纸 + 静态生成壁纸。点链接全屏打开，鼠标可以和动态壁纸互动。</p>
+
+    <h2>Live · 动态</h2>
+    <div class="grid">
+      <div class="card">
+        <iframe src="live/shoal.html" loading="lazy" title="Shoal"></iframe>
+        <div class="meta"><b>Shoal</b><a href="live/shoal.html">深色</a><a href="live/shoal.html?theme=light">浅色</a></div>
+      </div>
+      <div class="card">
+        <iframe src="live/isle.html" loading="lazy" title="Isle"></iframe>
+        <div class="meta"><b>Isle</b><a href="live/isle.html">昼夜循环</a><a href="live/isle.html?time=day">白天</a><a href="live/isle.html?time=sunset">日落</a><a href="live/isle.html?time=night">夜晚</a><a href="live/isle.html?ascii=0">方块版</a></div>
+      </div>
+    </div>
+
+    <h2>Static · 静态 (4K)</h2>
+    <div class="grid">
+      <div class="card"><img src="output/static/dunes-desktop.jpg" alt="Dunes" loading="lazy"><div class="meta"><b>Dunes</b><a href="output/static/dunes-desktop.jpg">电脑</a><a href="output/static/dunes-phone.jpg">手机</a></div></div>
+      <div class="card"><img src="output/static/bauhaus-desktop.jpg" alt="Bauhaus" loading="lazy"><div class="meta"><b>Bauhaus</b><a href="output/static/bauhaus-desktop.jpg">电脑</a><a href="output/static/bauhaus-phone.jpg">手机</a></div></div>
+      <div class="card"><img src="output/static/silk-desktop.jpg" alt="Silk" loading="lazy"><div class="meta"><b>Silk</b><a href="output/static/silk-desktop.jpg">电脑</a><a href="output/static/silk-phone.jpg">手机</a></div></div>
+      <div class="card"><img src="output/static/topography-desktop.jpg" alt="Topography" loading="lazy"><div class="meta"><b>Topography</b><a href="output/static/topography-desktop.jpg">电脑</a><a href="output/static/topography-phone.jpg">手机</a></div></div>
+      <div class="card"><img src="output/static/aurora-desktop.jpg" alt="Aurora" loading="lazy"><div class="meta"><b>Aurora</b><a href="output/static/aurora-desktop.jpg">电脑</a><a href="output/static/aurora-phone.jpg">手机</a></div></div>
+    </div>
+  </main>
+</body>
+</html>
