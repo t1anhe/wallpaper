@@ -280,3 +280,177 @@ function hash3(a, b, c = 0) {
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
+
+// Typeset post-process (WebGL): the piece paints an ordinary picture into `ctx`, in screen
+// coordinates, and render(out) sets it in type on paper. Each character cell takes the colour under
+// it and either a stroke (- \ | /) along an edge running through it, or a glyph from the density
+// ramp by how much ink its colour carries against the paper; a wash of the colour stays under the
+// type (taken from the picture at twice the cell resolution, so edges stay crisp), and colours lighter
+// than the paper show as bare, brighter paper. Cells are taller than wide, like a terminal; `res` is
+// the number of cells across the short side of the screen. Returns null when WebGL is unavailable.
+function makeTypeset(w, h, { res = 110, paper = [0.95, 0.9, 0.8], ramp = ' .:-=+*#%@', wash = 0.35, ink = 0.8, bold = false } = {}) {
+  const glc = document.createElement('canvas');
+  glc.width = w;
+  glc.height = h;
+  const gl = glc.getContext('webgl', { antialias: false, preserveDrawingBuffer: true });
+  if (!gl) return null;
+  const ch = Math.min(w, h) / res, cw = ch * 0.6;
+  const cols = Math.ceil(w / cw), rows = Math.ceil(h / ch);
+  const SUB = 2; // source pixels per cell, each way
+  const src = document.createElement('canvas');
+  src.width = cols * SUB;
+  src.height = rows * SUB;
+  const ctx = src.getContext('2d');
+  ctx.setTransform(src.width / w, 0, 0, src.height / h, 0, 0);
+  const GLYPHS = ramp + '-\\|/';
+  const NR = ramp.length.toFixed(1);
+
+  const CELL = `
+precision mediump float;
+uniform sampler2D uSrc;
+uniform vec2 uGrid;
+uniform vec3 uPaper;
+float lum(vec3 c) { return dot(c, vec3(.3, .59, .11)); }
+// Average colour of a cell; the source canvas runs top-down, cells bottom-up
+vec3 cellColour(vec2 c) {
+  vec2 b = vec2(c.x, uGrid.y - 1. - c.y) * ${SUB}.;
+  vec2 s = uGrid * ${SUB}.;
+  return (texture2D(uSrc, (b + vec2(.5, .5)) / s).rgb + texture2D(uSrc, (b + vec2(1.5, .5)) / s).rgb
+        + texture2D(uSrc, (b + vec2(.5, 1.5)) / s).rgb + texture2D(uSrc, (b + vec2(1.5, 1.5)) / s).rgb) * .25;
+}
+void main() {
+  vec2 cell = floor(gl_FragCoord.xy);
+  vec3 m = cellColour(cell);
+  vec3 cl = cellColour(cell - vec2(1., 0.)), cr = cellColour(cell + vec2(1., 0.));
+  vec3 cu = cellColour(cell + vec2(0., 1.)), cd = cellColour(cell - vec2(0., 1.));
+  float Lp = lum(uPaper), L = lum(m);
+  float ll = lum(cl), lr = lum(cr), lu = lum(cu), ld = lum(cd);
+  // Gradient on screen (y down); an edge runs along (-gy, gx)
+  float gx = lr - ll, gy = ld - lu;
+  float ink = clamp((Lp - L) / Lp, 0., 1.);
+  vec3 dark = m;
+  float dl = L;
+  if (ll < dl) { dark = cl; dl = ll; }
+  if (lr < dl) { dark = cr; dl = lr; }
+  if (lu < dl) { dark = cu; dl = lu; }
+  if (ld < dl) { dark = cd; dl = ld; }
+  float g;
+  vec3 c = m;
+  if (length(vec2(gx, gy)) > .14 && (Lp - dl) / Lp > .15) {
+    float a = mod(atan(gx, -gy), 3.14159);
+    g = ${NR} + mod(floor(a / .7854 + .5), 4.);
+    c = dark;
+  } else {
+    float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+    g = floor(clamp(pow(ink, .8) + (h - .5) * .08, 0., .999) * ${NR});
+  }
+  gl_FragColor = vec4(c, g / 255.);
+}`;
+
+  const TYPE = `
+precision mediump float;
+uniform sampler2D uCells, uAtlas, uSrc;
+uniform vec2 uGrid, uCellPx, uSize;
+uniform float uNG, uWash, uInk;
+uniform vec3 uPaper;
+float lum(vec3 c) { return dot(c, vec3(.3, .59, .11)); }
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+void main() {
+  vec2 cf = gl_FragCoord.xy / uCellPx;
+  vec2 cell = floor(cf), f = fract(cf);
+  vec4 s = texture2D(uCells, (cell + .5) / uGrid);
+  float g = floor(s.a * 255. + .5);
+  float m = texture2D(uAtlas, vec2((g + f.x) / uNG, 1. - f.y)).a;
+  // The wash under the type, straight from the picture
+  vec3 cb = texture2D(uSrc, vec2(gl_FragCoord.x / uSize.x, 1. - gl_FragCoord.y / uSize.y)).rgb;
+  float Lp = lum(uPaper), Lb = lum(cb);
+  // Paper: a faint grain, a little darker towards the edges
+  vec2 uv = gl_FragCoord.xy / (uGrid * uCellPx) - .5;
+  vec3 paper = uPaper * (1. - .1 * dot(uv, uv)) * (1. + (hash(floor(gl_FragCoord.xy * .5)) - .5) * .025);
+  vec3 bg = mix(paper, cb, max(uWash * clamp((Lp - Lb) / Lp, 0., 1.), clamp((Lb - Lp) * 4., 0., .85)));
+  gl_FragColor = vec4(mix(bg, s.rgb * uInk, m), 1.);
+}`;
+
+  function program(fs) {
+    const pr = gl.createProgram();
+    for (const [type, code] of [[gl.VERTEX_SHADER, 'attribute vec2 p; void main() { gl_Position = vec4(p, 0., 1.); }'], [gl.FRAGMENT_SHADER, fs]]) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, code);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      gl.attachShader(pr, s);
+    }
+    gl.bindAttribLocation(pr, 0, 'p');
+    gl.linkProgram(pr);
+    return { pr, u: (n) => gl.getUniformLocation(pr, n) };
+  }
+  const texture = (unit, filter) => {
+    const t = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  };
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  // Units: 0 the painted picture, 1 the cells, 2 the glyph atlas
+  const srcTex = texture(0, gl.LINEAR);
+  const cellTex = texture(1, gl.NEAREST);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, cols, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, cellTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  const aw = Math.max(2, Math.round(cw)), ah = Math.max(2, Math.round(ch));
+  const atlas = document.createElement('canvas');
+  atlas.width = aw * GLYPHS.length;
+  atlas.height = ah;
+  const ax = atlas.getContext('2d');
+  ax.fillStyle = '#fff';
+  ax.font = `${bold ? 'bold ' : ''}${Math.round(ah * 0.86)}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+  ax.textAlign = 'center';
+  ax.textBaseline = 'middle';
+  [...GLYPHS].forEach((g, i) => ax.fillText(g, i * aw + aw / 2, ah / 2 + ah * 0.04));
+  texture(2, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
+
+  const cell = program(CELL), type = program(TYPE);
+  gl.useProgram(cell.pr);
+  gl.uniform1i(cell.u('uSrc'), 0);
+  gl.uniform2f(cell.u('uGrid'), cols, rows);
+  gl.uniform3f(cell.u('uPaper'), ...paper);
+  gl.useProgram(type.pr);
+  gl.uniform1i(type.u('uCells'), 1);
+  gl.uniform1i(type.u('uAtlas'), 2);
+  gl.uniform1i(type.u('uSrc'), 0);
+  gl.uniform2f(type.u('uSize'), w, h);
+  gl.uniform2f(type.u('uGrid'), cols, rows);
+  gl.uniform2f(type.u('uCellPx'), cw, ch);
+  gl.uniform1f(type.u('uNG'), GLYPHS.length);
+  gl.uniform1f(type.u('uWash'), wash);
+  gl.uniform1f(type.u('uInk'), ink);
+  gl.uniform3f(type.u('uPaper'), ...paper);
+
+  function render(out) {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, srcTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.viewport(0, 0, cols, rows);
+    gl.useProgram(cell.pr);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, w, h);
+    gl.useProgram(type.pr);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    out.drawImage(glc, 0, 0);
+  }
+
+  return { ctx, render };
+}

@@ -14,11 +14,13 @@ Open `index.html` in the repository root for a gallery of everything.
 | **Isle** `live/isle.html` | A floating block island: a cabin with a smoking chimney, falling leaves, a pond, a waterfall, clouds, sun and moon. Runs a full day/night cycle; at night lanterns, the window and glowstone light up the blocks around them, and fireflies come out. The terrain is different on every load. | `?time=day/sunset/night` fixed time · `?day=60` seconds per day · `?seed=7` fixed terrain · `?res=200` finer glyphs · `?ascii=0` plain block version |
 | **Abyss** `live/abyss.html` | The deep sea, beyond the reach of sunlight. A single glowing jellyfish drifts through the dark, its tentacles trailing the path it swam. Marine snow shows only where its light falls, and now and then something flickers far away. Moving the pointer stirs faint bioluminescence. | `?res=200` finer glyphs · `?ascii=0` plain version |
 | **Tide** `live/tide.html` | A beach seen from straight above on a bright day, set entirely in type: the sand is dots and commas, the water tildes, the foam bubbles (`o O @`) and the sun's glitter stars. Swells break over a sandbar into lines of foam, run up the sand and slide back, leaving it dark and glossy for a moment. The water goes from clear turquoise over the sand to deep blue, light ripples across the bottom, and someone's footprints wander along the beach. Moving the pointer over the water stirs rings. Drawn on the GPU (WebGL). | `?res=90` larger type · `?ascii=0` plain picture |
+| **Kanagawa** `live/kanagawa.html` | After Hokusai's *The Great Wave off Kanagawa* (c. 1831), set in type on cream paper: the wave's lines come out as runs of `/ \ \| -`, its body as dense type in Prussian blue. The crest breaks into claws of foam that throw spray across the sky like snow; under the curl, far off, stands Mount Fuji. Boats ride the swell and a small wave in front echoes the mountain. The wave breathes, its claws flicker, the boats rise and fall. | `?res=90` larger type · `?ascii=0` plain picture |
 
 ![Shoal](output/previews/shoal.jpg)
 ![Isle at sunset](output/previews/isle-sunset.jpg)
 ![Abyss](output/previews/abyss-desktop.jpg)
 ![Tide](output/previews/tide-desktop.jpg)
+![Kanagawa](output/previews/kanagawa-desktop.jpg)
 
 ### Cross-stitch
 
@@ -34,6 +36,7 @@ Open `index.html` in the repository root for a gallery of everything.
 
 - `live/runtime.js`: a full-screen canvas runtime (high-DPI, fixed time step, pointer input, frame-exact recording) with two shared post-processing layers:
   - `makeAscii` samples the scene per cell, picks a glyph from a 70-step ramp by brightness and strokes edges with `/ \ | -`. Translucent layers (sky, glows) become sparse coloured glyphs. Add `?ascii=1` to any live wallpaper to turn it into ASCII.
+  - `makeTypeset` (WebGL) sets a picture in type on paper: each cell gets a stroke (`- \ | /`) along an edge running through it, or a glyph by how much ink its colour carries, over a wash of the picture's colour.
   - `makeStitch` draws the scene at one pixel per stitch, snaps every stitch to a fixed set of thread colours, then scales it up under an aida-cloth texture.
 - `live/blocks.js`: procedural block textures (grass, dirt, stone, ores, mossy cobble, logs, leaves, planks, brick, roof tiles, door, window, lantern, glowstone, water, waterfall, snow, sand, wool, flowers, tall grass, hanging roots).
 
