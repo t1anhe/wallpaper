@@ -1,17 +1,17 @@
-// Vigil — night over an empty field. A half-built tower stands at its edge with a crane beside it,
+// Vigil — night over open farmland. Across the fields a half-built tower stands with a crane beside it,
 // and the red warning lights on the roof and the crane blink slowly, on and off, all night.
-// Wind moves through the grass and the safety netting; the crane weathervanes almost imperceptibly;
-// far away a town glows on the horizon and, once in a while, a car's lights slide past.
+// A country road crosses the fields and now and then a car passes, its headlights sweeping the tarmac;
+// woods dark on the horizon, a town's glow behind them, wind moving over the crops and the safety net.
 //
-// The site is a small 3D scene seen from the field at eye height. The concrete frame (columns, slabs,
-// walls) is ray-cast once into a layer; the crane, netting and lights are projected every frame.
+// Everything is a small 3D world seen from about 20 m up (a window or a rooftop). The tower frame is
+// ray-cast once, the fields are mapped onto the ground plane once; the crane, cars and lights move.
 // Rendered as ASCII by default (?ascii=0 for the plain version, ?res=<glyph rows>).
 function createVigil({ w, h, rng }) {
-  const { noise2 } = makeNoise(rng);
+  const { noise2, fbm } = makeNoise(rng);
   const u = Math.min(w, h);
   const portrait = h > w;
   const TAU = Math.PI * 2;
-  const hy = Math.round(h * (portrait ? 0.7 : 0.74)); // horizon = eye level
+  const hy = Math.round(h * (portrait ? 0.4 : 0.42)); // horizon = eye level
   const lw = (k) => Math.max(1, u * k);
   const H = hexToRgb;
   const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
@@ -27,11 +27,11 @@ function createVigil({ w, h, rng }) {
   const NX = 5, NZ = 3, BAY = 4.8, FH = 3.2, FLOORS = portrait ? 16 : 14;
   const W = NX * BAY, D = NZ * BAY, TOP = FLOORS * FH;
   const center = [W / 2, 0, D / 2];
-  const R = 95, yaw = 0.62, eye = 1.6;
+  const R = 140, yaw = 0.62, eye = 20;
   const fwd = [-Math.sin(yaw), 0, Math.cos(yaw)], right = [Math.cos(yaw), 0, Math.sin(yaw)];
   const cam = [center[0] + R * Math.sin(yaw), eye, center[2] - R * Math.cos(yaw)];
-  const F = (h * (portrait ? 0.38 : 0.47) * R) / TOP;
-  const sx0 = w * (portrait ? 0.42 : 0.58);
+  const F = (h * (portrait ? 0.34 : 0.45) * R) / TOP;
+  const sx0 = w * (portrait ? 0.5 : 0.56);
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   function project(p) {
     const d = [p[0] - cam[0], p[1] - cam[1], p[2] - cam[2]];
@@ -200,45 +200,186 @@ function createVigil({ w, h, rng }) {
     poly([[E[0] - 6.8, 1.4, E[2]], [E[0] - 5.4, 1.4, E[2]], [E[0] - 6, 0, E[2]]], '#24231c');
   }
 
-  // A line of power poles running off toward the town, wires sagging between them
-  const poles = [];
-  {
-    const left = [-right[0], 0, -right[2]];
-    const start = [cam[0] + fwd[0] * 12 + left[0] * 7, 0, cam[2] + fwd[2] * 12 + left[2] * 7];
-    const b = 0.42;
-    const dir = [fwd[0] * Math.cos(b) + left[0] * Math.sin(b), 0, fwd[2] * Math.cos(b) + left[2] * Math.sin(b)];
-    for (let i = 0; i < 16; i++) poles.push([start[0] + dir[0] * i * 30, 0, start[2] + dir[2] * i * 30]);
-    poles.perp = [dir[2], 0, -dir[0]];
+  // ---------- the land: fields, a country road, the site's bare earth, woods ----------
+  const roadP = [cam[0] + fwd[0] * 72, 0, cam[2] + fwd[2] * 72];
+  const rAng = Math.atan2(right[2], right[0]) - 0.12;
+  const rd = [Math.cos(rAng), Math.sin(rAng)], rn = [-rd[1], rd[0]];
+  const toRoad = (X, Z) => {
+    const dx = X - roadP[0], dz = Z - roadP[2];
+    return [dx * rd[0] + dz * rd[1], dx * rn[0] + dz * rn[1]];
+  };
+  const nearSide = Math.sign(toRoad(cam[0], cam[2])[1]);
+  const roadPoint = (a, b, y = 0) => [roadP[0] + rd[0] * a + rn[0] * b, y, roadP[2] + rd[1] * a + rn[1] * b];
+  // The site's access track runs from the gate out to the road
+  const gate = [W * 0.4, 0, -12];
+  const gateFoot = roadPoint(toRoad(gate[0], gate[2])[0], 0);
+  const sm = (e0, e1, x) => {
+    const k = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+    return k * k * (3 - 2 * k);
+  };
+  const HAZE = [20, 26, 38];
+  const CROP = [
+    [[19, 17, 15], [27, 24, 20]], // ploughed soil
+    [[13, 18, 15], [19, 26, 21]], // young crop in rows
+    [[24, 23, 18], [29, 27, 21]], // stubble
+    [[14, 18, 15], [18, 23, 19]], // grass
+  ];
+  // Colour of the ground at world (X, Z), seen from `dist` metres away
+  function ground(X, Z, dist) {
+    const [a, b] = toRoad(X, Z);
+    const fade = 1 - sm(60, 320, dist);
+    const n = noise2(X * 0.06, Z * 0.06) * 0.12;
+    let c, crop = false;
+    const ab = Math.abs(b);
+    if (ab < 3.3) {
+      c = [22, 23, 26];
+      if (ab > 3.0) c = lerp(c, [52, 52, 48], fade);
+      if (ab < 0.13 && ((a % 10) + 10) % 10 < 4) c = lerp(c, [74, 74, 66], fade);
+    } else if (ab < 5) {
+      c = [27, 28, 23];
+    } else {
+      // Access track to the gate
+      const gx = gateFoot[0] - gate[0], gz = gateFoot[2] - gate[2], gl = gx * gx + gz * gz;
+      const f = Math.max(0, Math.min(1, ((X - gate[0]) * gx + (Z - gate[2]) * gz) / gl));
+      const dTrack = Math.hypot(X - gate[0] - gx * f, Z - gate[2] - gz * f);
+      if (dTrack < 1.9) {
+        c = [34, 31, 26];
+        if (Math.abs(dTrack - 0.9) < 0.22) c = lerp(c, [44, 40, 34], fade);
+      } else if (X > -14 && X < W + 22 && Z > -12 && Z < D + 14) {
+        c = lerp([28, 26, 22], [36, 33, 28], noise2(X * 0.15, Z * 0.15) + 0.5); // bare earth of the site
+      } else {
+        // Fields: road-aligned parcels, staggered, with dark hedgerows between
+        const side = Math.sign(b);
+        const bb = ab - 5;
+        const ib = Math.floor(bb / 46);
+        const aa = a + hash3(ib, side, 4) * 70;
+        const ia = Math.floor(aa / 70);
+        const fa = aa - ia * 70, fb = bb - ib * 46;
+        if (fa < 1.6 || fb < 1.4) {
+          c = [8, 11, 9];
+        } else {
+          const type = Math.floor(hash3(ia, ib * side, 7) * 4);
+          crop = true;
+          const along = hash3(ia, ib, 9) < 0.5 ? a : b;
+          const rows = type < 2 ? 0.5 + 0.5 * Math.sin((along / 1.4) * Math.PI * 2) : 0.5;
+          const [c0, c1] = CROP[type];
+          c = lerp(c0, c1, Math.max(0, Math.min(1, 0.5 + (rows - 0.5) * fade + n)));
+        }
+      }
+    }
+    return [lerp(c, HAZE, sm(120, 1500, dist) * 0.9), crop];
   }
+
+  // Ground layer: every pixel below the horizon mapped back onto the ground plane, once
+  const step = w > 1600 ? 2 : 1;
+  const groundLayer = mk(w, h);
+  const sheenCells = [];
+  const SH = 4; // sheen grid, in pixels
+  {
+    const gx = groundLayer.getContext('2d');
+    const img = gx.createImageData(w, h - hy);
+    for (let py = hy; py < h; py += step) {
+      const ay = -(py + 0.5 - hy) / F;
+      const t = cam[1] / -ay;
+      for (let px = 0; px < w; px += step) {
+        const ax = (px + 0.5 - sx0) / F;
+        const X = cam[0] + (right[0] * ax + fwd[0]) * t, Z = cam[2] + (right[2] * ax + fwd[2]) * t;
+        const dist = t * Math.hypot(right[0] * ax + fwd[0], right[2] * ax + fwd[2]);
+        const [c] = ground(X, Z, dist);
+        for (let yy = py; yy < Math.min(py + step, h); yy++) {
+          for (let xx = px; xx < Math.min(px + step, w); xx++) {
+            const i = ((yy - hy) * w + xx) * 4;
+            img.data[i] = c[0];
+            img.data[i + 1] = c[1];
+            img.data[i + 2] = c[2];
+            img.data[i + 3] = 255;
+          }
+        }
+      }
+    }
+    gx.putImageData(img, 0, hy);
+    for (let py = hy; py < h; py += SH) {
+      const ay = -(py + SH / 2 - hy) / F;
+      const t = cam[1] / -ay;
+      for (let px = 0; px < w; px += SH) {
+        const ax = (px + SH / 2 - sx0) / F;
+        const X = cam[0] + (right[0] * ax + fwd[0]) * t, Z = cam[2] + (right[2] * ax + fwd[2]) * t;
+        const dist = t * Math.hypot(right[0] * ax + fwd[0], right[2] * ax + fwd[2]);
+        if (ground(X, Z, dist)[1]) sheenCells.push([px / SH, (py - hy) / SH, X, Z, 1 - sm(200, 1200, dist)]);
+      }
+    }
+  }
+  const sheen = mk(Math.ceil(w / SH), Math.ceil((h - hy) / SH));
+  const sheenX = sheen.getContext('2d');
+  const sheenImg = sheenX.createImageData(sheen.width, sheen.height);
+
+  // Far layer: the forest along the horizon, and a few woods out in the fields
+  const farLayer = mk(w, h);
+  {
+    const fx = farLayer.getContext('2d');
+    fx.fillStyle = 'rgb(10,13,17)';
+    fx.beginPath();
+    fx.moveTo(0, hy + u * 0.006);
+    for (let x = 0; x <= w; x += 2) {
+      const top = hy - u * (0.008 + 0.018 * (fbm(x / u * 2.5, 1.2, 3) + 0.5) + 0.006 * Math.abs(noise2(x / u * 45, 3)));
+      fx.lineTo(x, top);
+    }
+    fx.lineTo(w, hy + u * 0.006);
+    fx.fill();
+    const trees = [];
+    for (const [d, x, n] of [[430, -170, 70], [680, 160, 90], [320, 250, 45], [900, -40, 80]]) {
+      const c = [cam[0] + fwd[0] * d + right[0] * x, cam[2] + fwd[2] * d + right[2] * x];
+      for (let i = 0; i < n; i++) {
+        const a = rng() * TAU, r = Math.sqrt(rng());
+        trees.push([c[0] + Math.cos(a) * r * 55, c[1] + Math.sin(a) * r * 28, 3.5 + rng() * 2.5, 7 + rng() * 3]);
+      }
+    }
+    trees
+      .map(([X, Z, r, y]) => [project([X, y, Z]), project([X, 0, Z]), r])
+      .filter(([p]) => p[2] > 1)
+      .sort((p, q) => q[0][2] - p[0][2])
+      .forEach(([p, base, r]) => {
+        const rx = (F * r) / p[2];
+        fx.fillStyle = 'rgb(12,17,14)';
+        fx.fillRect(p[0] - Math.max(1, rx * 0.12), p[1], Math.max(1, rx * 0.24), base[1] - p[1]);
+        fx.beginPath();
+        fx.ellipse(p[0], p[1], rx, rx * 1.15, 0, 0, TAU);
+        fx.fill();
+      });
+  }
+
+  // Power poles along the near side of the road, wires sagging between them
   const poleLayer = mk(w, h);
   {
     const px = poleLayer.getContext('2d');
-    const per = poles.perp;
-    const arm = (p, s) => [p[0] + per[0] * s, 8.4, p[2] + per[2] * s];
-    for (let i = poles.length - 1; i >= 0; i--) {
-      const p = poles[i];
-      const a = project(p), b = project([p[0], 9.2, p[2]]);
-      if (a[2] < 1) continue;
-      px.strokeStyle = '#1a2028';
-      px.lineWidth = Math.max(1, (F * 0.28) / a[2]);
+    const poles = [];
+    for (let a = -900; a <= 900; a += 45) {
+      const p = roadPoint(a, nearSide * 6.5);
+      const q = project(p);
+      if (q[2] > 8 && q[0] > -w * 0.3 && q[0] < w * 1.3) poles.push([a, p, q[2]]);
+    }
+    poles.sort((p, q) => q[2] - p[2]);
+    const arm = (a, s, y) => roadPoint(a, nearSide * 6.5 + s, y);
+    for (const [a, p, z] of poles) {
+      px.strokeStyle = '#1b2129';
+      px.lineWidth = Math.max(1, (F * 0.3) / z);
       px.beginPath();
-      px.moveTo(a[0], a[1]);
-      px.lineTo(b[0], b[1]);
-      const l = project(arm(p, -1.1)), r = project(arm(p, 1.1));
+      const b0 = project(p), b1 = project([p[0], 10, p[2]]);
+      px.moveTo(b0[0], b0[1]);
+      px.lineTo(b1[0], b1[1]);
+      const l = project(arm(a, -1.2, 9.2)), r = project(arm(a, 1.2, 9.2));
       px.moveTo(l[0], l[1]);
       px.lineTo(r[0], r[1]);
       px.stroke();
-      if (i === poles.length - 1) continue;
-      // Three wires to the next pole, each a shallow catenary
-      const q = poles[i + 1];
-      px.strokeStyle = 'rgba(62,72,90,0.9)';
+      px.strokeStyle = 'rgba(62,72,90,0.85)';
       px.lineWidth = lw(0.0007);
       px.beginPath();
-      for (const s of [-1, 0, 1]) {
+      for (const sOff of [-1.1, 0, 1.1]) {
         for (let k = 0; k <= 16; k++) {
           const f = k / 16;
-          const y = (s === 0 ? 9.2 : 8.4) - Math.sin(f * Math.PI) * 0.9;
-          const pt = project([p[0] + (q[0] - p[0]) * f + per[0] * s * 1.0, y, p[2] + (q[2] - p[2]) * f + per[2] * s * 1.0]);
+          const y = (sOff === 0 ? 10 : 9.2) - Math.sin(f * Math.PI) * 1.0;
+          const pt = project(arm(a + 45 * f, sOff, y));
+          if (pt[2] < 1) continue;
           k ? px.lineTo(pt[0], pt[1]) : px.moveTo(pt[0], pt[1]);
         }
       }
@@ -246,19 +387,8 @@ function createVigil({ w, h, rng }) {
     }
   }
 
-  // A dirt road from the viewer's feet to the site gate
-  const road = (() => {
-    const from = [cam[0] + fwd[0] * 18, 0, cam[2] + fwd[2] * 18], to = [-6, 0, -11];
-    const d = [to[0] - from[0], to[2] - from[2]], dl = Math.hypot(...d);
-    const n = [-d[1] / dl, d[0] / dl];
-    const edge = (s, side) => [from[0] + (to[0] - from[0]) * s + n[0] * side, 0, from[2] + (to[2] - from[2]) * s + n[1] * side];
-    return { edge };
-  })();
-
-  // Foreground grass, close enough to stand out against the field
-  const blades = Array.from({ length: Math.round(w / (u * 0.006)) }, () => ({
-    x: rng() * w, ht: u * (0.015 + Math.pow(rng(), 2) * 0.07), p: rng() * 10, lean: (rng() - 0.5) * 0.4,
-  }));
+  const cars = [];
+  let nextCarAt = 1, firstCar = true;
   let plane = null, nextPlane = 14;
 
   // Crane, netting, hoarding: positions in the same world
@@ -275,11 +405,6 @@ function createVigil({ w, h, rng }) {
     c: rng() < 0.75 ? '#ffc98a' : '#e8eef8', a: 0.3 + rng() * 0.5, p: rng() * 10,
   }));
   const clouds = Array.from({ length: 3 }, () => ({ x: rng() * w, y: hy * (0.15 + rng() * 0.45), len: u * (0.4 + rng() * 0.5), v: u * (0.004 + rng() * 0.004) }));
-  let car = null, nextCar = 6;
-
-  const fieldH = h - hy;
-  let fieldImg = null;
-  const GRASS_LO = H('#0a0e0b'), GRASS_HI = H('#222e23');
 
   function update(dt, t) {
     now = t;
@@ -292,10 +417,17 @@ function createVigil({ w, h, rng }) {
       plane = null;
       nextPlane = t + 50 + rng() * 40;
     }
-    if (!car && t > nextCar) car = { x: w + u * 0.05, v: u * (0.02 + rng() * 0.015) };
-    if (car && (car.x -= car.v * dt) < -u * 0.05) {
-      car = null;
-      nextCar = t + 18 + rng() * 25;
+    // Now and then a car along the road, either way
+    if (t > nextCarAt) {
+      const dir = rng() < 0.5 ? 1 : -1;
+      cars.push({ a: -dir * (firstCar ? 160 : 750), dir, v: 13 + rng() * 7, lane: -dir * nearSide * 1.6, truck: rng() < 0.25 });
+      firstCar = false;
+      nextCarAt = t + 9 + rng() * 16;
+    }
+    for (let i = cars.length - 1; i >= 0; i--) {
+      const c = cars[i];
+      c.a += c.dir * c.v * dt;
+      if (c.a * c.dir > 760) cars.splice(i, 1);
     }
   }
 
@@ -328,27 +460,50 @@ function createVigil({ w, h, rng }) {
     ctx.fillRect(0, hy, w, h - hy);
   }
 
-  function drawField(ctx, t) {
-    if (!fieldImg) fieldImg = ctx.createImageData(w, fieldH);
-    const d = fieldImg.data;
-    for (let y = 0; y < fieldH; y += 3) {
-      const z = y / fieldH;
-      const sc = 1 / (0.12 + z);
-      for (let x = 0; x < w; x += 3) {
-        const v = noise2(x * 0.004 * sc - t * 0.12, (y + 3) * 0.035 * sc) + 0.5;
-        const c = lerp(GRASS_LO, GRASS_HI, Math.max(0, Math.min(1, v * (0.35 + 0.65 * z))));
-        for (let yy = y; yy < Math.min(y + 3, fieldH); yy++) {
-          for (let xx = x; xx < Math.min(x + 3, w); xx++) {
-            const i = (yy * w + xx) * 4;
-            d[i] = c[0];
-            d[i + 1] = c[1];
-            d[i + 2] = c[2];
-            d[i + 3] = 255;
-          }
-        }
-      }
+  // Wind over the crops: soft bands of sheen drifting across the fields
+  function drawSheen(ctx, t) {
+    const d = sheenImg.data;
+    d.fill(0);
+    for (const [cx, cy, X, Z, k] of sheenCells) {
+      const v = noise2(X * 0.012 - t * 0.35, Z * 0.012 + t * 0.1) - 0.12;
+      if (v <= 0) continue;
+      const i = (cy * sheen.width + cx) * 4;
+      d[i] = 150;
+      d[i + 1] = 170;
+      d[i + 2] = 140;
+      d[i + 3] = Math.min(255, v * k * 120);
     }
-    ctx.putImageData(fieldImg, 0, hy);
+    sheenX.putImageData(sheenImg, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(sheen, 0, hy, sheen.width * SH, sheen.height * SH);
+  }
+
+  // A car on the road: dark body, headlights throwing a pool of light ahead, red tail lights
+  function drawCar(ctx, c) {
+    const L = c.truck ? 3.6 : 2.2, Wd = c.truck ? 1.2 : 0.9, Ht = c.truck ? 3 : 1.4;
+    const at = (along, lat, y) => roadPoint(c.a + c.dir * along, c.lane + lat, y);
+    const mid = project(at(0, 0, 0));
+    if (mid[2] < 5 || mid[0] < -w * 0.2 || mid[0] > w * 1.2) return;
+    // Beam on the tarmac
+    const b0 = project(at(L, 0, 0)), b1 = project(at(L + 32, 0, 0));
+    const g = ctx.createLinearGradient(b0[0], b0[1], b1[0], b1[1]);
+    g.addColorStop(0, 'rgba(255,236,190,0.42)');
+    g.addColorStop(1, 'rgba(255,236,190,0)');
+    ctx.fillStyle = g;
+    quad(ctx, [at(L, -Wd, 0.02), at(L, Wd, 0.02), at(L + 32, Wd + 4.5, 0.02), at(L + 32, -Wd - 4.5, 0.02)]);
+    // Body
+    ctx.fillStyle = c.truck ? '#20252d' : '#181c22';
+    quad(ctx, [at(-L, -Wd, 0.3), at(L, -Wd, 0.3), at(L, -Wd, Ht), at(-L, -Wd, Ht)]);
+    quad(ctx, [at(-L, Wd, 0.3), at(L, Wd, 0.3), at(L, Wd, Ht), at(-L, Wd, Ht)]);
+    quad(ctx, [at(-L, -Wd, Ht), at(L, -Wd, Ht), at(L, Wd, Ht), at(-L, Wd, Ht)]);
+    const r = Math.max(1.2, (F * 0.18) / mid[2]);
+    for (const s of [-0.7, 0.7]) {
+      const hl = project(at(L, s * Wd, 0.75)), tl = project(at(-L, s * Wd, 0.85));
+      ctx.fillStyle = 'rgba(255,248,225,1)';
+      ctx.fillRect(hl[0] - r, hl[1] - r, r * 2, r * 2);
+      ctx.fillStyle = 'rgba(255,40,30,0.95)';
+      ctx.fillRect(tl[0] - r * 0.8, tl[1] - r * 0.8, r * 1.6, r * 1.6);
+    }
   }
 
   const line = (ctx, a, b) => {
@@ -481,17 +636,13 @@ function createVigil({ w, h, rng }) {
       ctx.ellipse(c.x, c.y, c.len / 2, u * 0.012, 0, 0, TAU);
       ctx.fill();
     }
-    drawField(ctx, t);
     for (const l of town) {
       ctx.fillStyle = rgba(l.c, l.a * (0.75 + 0.25 * Math.sin(t * 0.8 + l.p)));
       ctx.fillRect(l.x, l.y - lw(0.0015), lw(0.0022), lw(0.0022));
     }
-    if (car) {
-      const fade = Math.min(1, Math.min(car.x, w - car.x) / (u * 0.15));
-      ctx.fillStyle = `rgba(255,244,220,${0.85 * fade})`;
-      ctx.fillRect(car.x, hy + u * 0.004, lw(0.003), lw(0.0022));
-      ctx.fillRect(car.x + lw(0.006), hy + u * 0.004, lw(0.003), lw(0.0022));
-    }
+    ctx.drawImage(groundLayer, 0, 0);
+    ctx.drawImage(farLayer, 0, 0);
+    drawSheen(ctx, t);
 
     if (plane) {
       const blink = Math.sin(t * 6) > 0.6;
@@ -502,22 +653,9 @@ function createVigil({ w, h, rng }) {
         ctx.fillRect(plane.x - lw(0.006), plane.y, lw(0.0025), lw(0.0025));
       }
     }
-    // Road: a slightly paler strip with two worn wheel tracks
-    ctx.fillStyle = 'rgba(30,35,31,0.9)';
-    ctx.beginPath();
-    for (let k = 0; k <= 12; k++) { const p = project(road.edge(k / 12, -1.7)); k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
-    for (let k = 12; k >= 0; k--) { const p = project(road.edge(k / 12, 1.7)); ctx.lineTo(p[0], p[1]); }
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(38,44,38,0.7)';
-    ctx.lineWidth = lw(0.0012);
-    ctx.beginPath();
-    for (const side of [-1, 1]) {
-      for (let k = 0; k <= 12; k++) { const p = project(road.edge(k / 12, side * 0.8)); k ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); }
-    }
-    ctx.stroke();
-    ctx.drawImage(poleLayer, 0, 0);
-
     ctx.drawImage(frame, 0, 0);
+    ctx.drawImage(poleLayer, 0, 0);
+    for (const c of cars) drawCar(ctx, c);
     // A bare bulb left burning inside the sixth floor, warming the concrete around it
     const bulb = project([W * 0.62, 6 * FH + 2.3, D * 0.3]);
     const flick = 0.85 + 0.15 * noise2(t * 3, 1.7);
@@ -550,16 +688,6 @@ function createVigil({ w, h, rng }) {
       ctx.fillRect(lx - u * 0.09, ly - u * 0.09, u * 0.18, u * 0.18);
     }
     ctx.globalCompositeOperation = 'source-over';
-    // Grass in the foreground, leaning with the wind
-    ctx.strokeStyle = '#0f1510';
-    ctx.lineWidth = lw(0.0016);
-    ctx.beginPath();
-    for (const b of blades) {
-      const bend = (noise2(b.x * 0.004 - t * 0.25, 2) * 0.6 + b.lean) * b.ht;
-      ctx.moveTo(b.x, h);
-      ctx.quadraticCurveTo(b.x + bend * 0.3, h - b.ht * 0.6, b.x + bend, h - b.ht);
-    }
-    ctx.stroke();
     for (const [lx, ly, , off] of lights) {
       const k = beacon(t, off);
       const g = ctx.createRadialGradient(lx, ly, 0, lx, ly, u * 0.035);
