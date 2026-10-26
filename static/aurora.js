@@ -2,6 +2,8 @@
 WALLPAPERS.aurora = {
   title: 'Aurora',
   seed: 7,
+  asciiGain: 2.2,
+  asciiBlack: 10,
   draw(ctx, w, h, rng) {
     const { noise2, fbm } = makeNoise(rng);
     const u = Math.min(w, h) / 2160;

@@ -2,6 +2,8 @@
 WALLPAPERS.silk = {
   title: 'Silk',
   seed: 2026,
+  asciiGain: 4,
+  asciiBlack: 14,
   draw(ctx, w, h, rng) {
     const { fbm } = makeNoise(rng);
     const u = Math.min(w, h) / 2160;

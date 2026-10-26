@@ -94,6 +94,10 @@ Notes:
 
 Dunes, Bauhaus, Silk, Topography and Aurora: `output/static/*-desktop.jpg` (3840×2160) and `*-phone.jpg` (1290×2796).
 
+ASCII versions of the same five are in `output/static/ascii/` (`node render-static.js --ascii`).
+
+![The static set in ASCII](output/previews/static-ascii.jpg)
+
 ## Regenerating
 
 Needs Node.js, Playwright (Chromium) and ffmpeg.
