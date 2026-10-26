@@ -298,39 +298,25 @@ function createIsle({ w, h, rng, params }) {
     ctx.fillRect(ox - z * 3, oy - z * 3, z * 6, z * 6);
   }
 
-  // In ASCII mode the sky stays a dim, smooth backdrop (with glyph stars and soft glows)
-  // and only the scene above it becomes glyphs.
+  // In ASCII mode the screen behind the glyphs is the sky gradient at a sixth of its brightness; the sky itself
+  // is drawn faintly into the glyph layer so it reads as sparse dots, like everything else.
   function drawBackground(ctx) {
-    const sk = sky();
-    paintSky(ctx, sk, 0.4 + 0.2 * sk.day);
-    for (const [phase, moon] of [[sk.tod, false], [(sk.tod + 0.5) % 1, true]]) {
-      const a = phase * Math.PI * 2;
-      if (Math.sin(a) < -0.15) continue;
-      orbGlow(ctx, Math.round((w / 2 - Math.cos(a) * w * 0.44) / bs) * bs, Math.round((h * 0.64 - Math.sin(a) * h * 0.52) / bs) * bs, bs * 4, moon);
-    }
-    if (sk.night > 0.05) {
-      ctx.font = `${Math.round(bs * 0.6)}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      for (const s of stars) {
-        const a = sk.night * (0.35 + 0.65 * Math.sin(now * 1.3 + s.p) ** 2);
-        const sx = ((s.x * bs * 0.5 - par.x * bs * 2) % w + w) % w, sy = s.y * bs * 0.5;
-        if (sy > h * 0.75) continue;
-        ctx.fillStyle = `rgba(255,250,235,${a})`;
-        ctx.fillText(s.s > 1 ? '*' : a > 0.6 ? '+' : '.', sx, sy);
-      }
-    }
+    paintSky(ctx, sky(), 0.16);
   }
 
   function draw(ctx, layered) {
     const t = now;
     const sk = sky();
     const { tod, day, night, dusk } = sk;
-    if (layered) ctx.clearRect(0, 0, w, h);
-    else paintSky(ctx, sk, 1);
+    if (layered) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalAlpha = 0.45;
+      paintSky(ctx, sk, 1);
+      ctx.globalAlpha = 1;
+    } else paintSky(ctx, sk, 1);
 
     // Stars
-    if (!layered && night > 0.05) {
+    if (night > 0.05) {
       for (const s of stars) {
         const a = night * (0.4 + 0.6 * Math.sin(t * 1.3 + s.p) ** 2);
         const sx = ((s.x * bs * 0.5 - par.x * bs * 2) % w + w) % w, sy = s.y * bs * 0.5;
@@ -348,7 +334,7 @@ function createIsle({ w, h, rng, params }) {
       const oy = Math.round((h * 0.64 - Math.sin(a) * h * 0.52) / bs) * bs;
       if (Math.sin(a) < -0.15) return;
       const z = bs * 4;
-      if (!layered) orbGlow(ctx, ox, oy, z, isMoon);
+      orbGlow(ctx, ox, oy, z, isMoon);
       ctx.fillStyle = colB;
       ctx.fillRect(ox - z / 2 - bs / 2, oy - z / 2 - bs / 2, z + bs, z + bs);
       ctx.fillStyle = colA;

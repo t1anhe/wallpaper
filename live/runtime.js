@@ -125,23 +125,26 @@ function makeAscii(w, h, density) {
   const cX = colored.getContext('2d');
 
   function render(ctx) {
+    sm.globalCompositeOperation = 'copy'; // replace last frame, so transparent areas stay transparent
     sm.drawImage(src, 0, 0, cols, rows);
     const d = sm.getImageData(0, 0, cols, rows).data;
     for (let i = 0, j = 0; i < lum.length; i++, j += 4) {
-      // Treat partly transparent cells (glows, haze) as fading out: dimmer and sparser glyphs.
+      // Partly transparent cells (sky, glows, haze) become sparse coloured glyphs with no tile behind
+      // them; glyph density falls off faster than alpha so they read as lighter texture.
       const a = d[j + 3] / 255;
-      const r = d[j] * a, g = d[j + 1] * a, b = d[j + 2] * a;
-      lum[i] = a < 0.1 ? -1 : r * 0.3 + g * 0.59 + b * 0.11;
-      bgImg.data[j] = r * 0.36;
-      bgImg.data[j + 1] = g * 0.36;
-      bgImg.data[j + 2] = b * 0.36;
-      bgImg.data[j + 3] = Math.min(255, a * 1.4 * 255);
+      lum[i] = a < 0.1 ? -1 : (d[j] * 0.3 + d[j + 1] * 0.59 + d[j + 2] * 0.11) * a * Math.min(1, a * 1.6);
+      const tile = Math.max(0, Math.min(1, (a - 0.5) * 2));
+      bgImg.data[j] = d[j] * 0.36;
+      bgImg.data[j + 1] = d[j + 1] * 0.36;
+      bgImg.data[j + 2] = d[j + 2] * 0.36;
+      bgImg.data[j + 3] = tile * 255;
       // Lift dark colours so their glyphs stay legible without losing hue
-      const lift = Math.min(2.4, Math.max(1.15, 170 / (Math.max(d[j], d[j + 1], d[j + 2]) + 1))) * Math.min(1, a * 1.2);
-      // r/g/b are already scaled by alpha, so the lift brightens dark solids but keeps haze faint
-      fgImg.data[j] = r * lift + 14 * a;
-      fgImg.data[j + 1] = g * lift + 14 * a;
-      fgImg.data[j + 2] = b * lift + 14 * a;
+      const lift = Math.min(2.4, Math.max(1.15, 170 / (Math.max(d[j], d[j + 1], d[j + 2]) + 1))) * Math.min(1, a * 2);
+      // ...and push saturation a little, since thin glyph strokes read greyer than solid colour
+      const L = d[j] * 0.3 + d[j + 1] * 0.59 + d[j + 2] * 0.11;
+      fgImg.data[j] = (L + (d[j] - L) * 1.4) * lift + 14;
+      fgImg.data[j + 1] = (L + (d[j + 1] - L) * 1.4) * lift + 14;
+      fgImg.data[j + 2] = (L + (d[j + 2] - L) * 1.4) * lift + 14;
       fgImg.data[j + 3] = 255;
     }
     bgX.putImageData(bgImg, 0, 0);
@@ -181,6 +184,93 @@ function makeAscii(w, h, density) {
   }
 
   return { src, ctx: src.getContext('2d'), render, scale };
+}
+
+// Cross-stitch post-process: the piece paints at one pixel per stitch into `ctx` (cols x rows);
+// render() snaps every stitch to the nearest thread colour (with a little fixed speckle, like
+// a hand-charted pattern) and scales it up under an aida-cloth texture.
+function makeStitch(w, h, density, threads, grain = 16) {
+  const cs = Math.max(3, Math.round(Math.min(w, h) / density));
+  const cols = Math.ceil(w / cs), rows = Math.ceil(h / cs);
+  const mk = (cw, ch) => {
+    const c = document.createElement('canvas');
+    c.width = cw;
+    c.height = ch;
+    return c;
+  };
+  const scene = mk(cols, rows);
+  const sx = scene.getContext('2d', { willReadFrequently: true });
+  const pal = threads.map(hexToRgb);
+  const quant = mk(cols, rows);
+  const qx = quant.getContext('2d');
+  const qImg = qx.createImageData(cols, rows);
+  const cache = new Int16Array(32768).fill(-1);
+  const speckle = new Float32Array(cols * rows).map((_, i) => (hash3(i % cols, (i / cols) | 0, 5) - 0.5) * grain);
+
+  function nearest(r, g, b) {
+    const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+    let k = cache[key];
+    if (k >= 0) return k;
+    let best = 1e9;
+    for (let i = 0; i < pal.length; i++) {
+      const dr = r - pal[i][0], dg = g - pal[i][1], db = b - pal[i][2];
+      const d = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+      if (d < best) { best = d; k = i; }
+    }
+    cache[key] = k;
+    return k;
+  }
+
+  // Aida cloth: one tile per stitch with a soft X and a dark weave line.
+  const tile = mk(cs, cs);
+  {
+    const x = tile.getContext('2d');
+    if (cs >= 5) {
+      x.lineWidth = Math.max(1, cs * 0.2);
+      x.strokeStyle = 'rgba(0,0,0,0.12)';
+      x.beginPath();
+      x.moveTo(1, 1.6); x.lineTo(cs - 1.6, cs - 1);
+      x.moveTo(cs - 1, 1.6); x.lineTo(1.6, cs - 1);
+      x.stroke();
+      x.strokeStyle = 'rgba(255,255,255,0.08)';
+      x.beginPath();
+      x.moveTo(1, 1); x.lineTo(cs - 2, cs - 2);
+      x.moveTo(cs - 1, 1); x.lineTo(2, cs - 2);
+      x.stroke();
+    }
+    x.fillStyle = 'rgba(0,0,0,0.3)';
+    x.fillRect(cs - 1, 0, 1, cs);
+    x.fillRect(0, cs - 1, cs, 1);
+    x.fillStyle = 'rgba(255,255,255,0.06)';
+    x.fillRect(0, 0, cs, 1);
+    x.fillRect(0, 0, 1, cs);
+  }
+  let cloth = null;
+
+  function render(ctx) {
+    const d = sx.getImageData(0, 0, cols, rows).data;
+    const q = qImg.data;
+    for (let i = 0, j = 0; i < speckle.length; i++, j += 4) {
+      const n = speckle[i];
+      const k = nearest(
+        Math.max(0, Math.min(255, d[j] + n)) | 0,
+        Math.max(0, Math.min(255, d[j + 1] + n)) | 0,
+        Math.max(0, Math.min(255, d[j + 2] + n)) | 0
+      );
+      q[j] = pal[k][0];
+      q[j + 1] = pal[k][1];
+      q[j + 2] = pal[k][2];
+      q[j + 3] = 255;
+    }
+    qx.putImageData(qImg, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(quant, 0, 0, cols * cs, rows * cs);
+    cloth = cloth || ctx.createPattern(tile, 'repeat');
+    ctx.fillStyle = cloth;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  return { cs, cols, rows, ctx: sx, render };
 }
 
 // Cheap integer hash -> [0, 1). Stable per cell, so flicker and textures don't shimmer randomly.
