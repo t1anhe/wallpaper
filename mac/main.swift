@@ -67,6 +67,7 @@ func installBundledWallpapers() {
     let firstRun = !fm.fileExists(atPath: wallpaperDir.path)
     try? fm.createDirectory(at: wallpaperDir, withIntermediateDirectories: true)
     guard firstRun || defaults.string(forKey: "installedVersion") != version else { return }
+    var shipped = Set<String>()
     for rel in fm.subpaths(atPath: src.path) ?? [] {
         let from = src.appendingPathComponent(rel)
         let to = wallpaperDir.appendingPathComponent(rel)
@@ -75,10 +76,18 @@ func installBundledWallpapers() {
         if isDir.boolValue {
             try? fm.createDirectory(at: to, withIntermediateDirectories: true)
         } else {
+            shipped.insert(rel)
             try? fm.removeItem(at: to)
             try? fm.copyItem(at: from, to: to)
         }
     }
+    // Remove wallpapers that earlier builds shipped and this one no longer does. Builds from before
+    // this list was kept are covered by naming their retired files.
+    let earlier = Set(defaults.stringArray(forKey: "bundledFiles") ?? []).union(["live/vigil.html", "live/vigil.js"])
+    for rel in earlier.subtracting(shipped) {
+        try? fm.removeItem(at: wallpaperDir.appendingPathComponent(rel))
+    }
+    defaults.set(Array(shipped), forKey: "bundledFiles")
     let readme = """
     Wallpaper folder
 
