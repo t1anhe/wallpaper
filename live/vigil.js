@@ -1,17 +1,19 @@
-// Vigil — night over open farmland. Across the fields a half-built tower stands with a crane beside it,
-// and the red warning lights on the roof and the crane blink slowly, on and off, all night.
-// A country road crosses the fields and now and then a car passes, its headlights sweeping the tarmac;
-// woods dark on the horizon, a town's glow behind them, wind moving over the crops and the safety net.
+// Vigil — a construction site out on open farmland, at night. A long half-built tower and its crane fill
+// the lower left of the picture, and the red warning lights on the roof and the crane blink slowly, on and
+// off, all night. Beyond them the fields open out: a country road where now and then a car passes, a belt
+// of trees, woods dark on the horizon with a town's glow behind them, wind moving over the crops.
 //
-// Everything is a small 3D world seen from about 20 m up (a window or a rooftop). The tower frame is
-// ray-cast once, the fields are mapped onto the ground plane once; the crane, cars and lights move.
+// Everything is a small 3D world seen from a window across the way, a little above the tower's roof.
+// The tower and the crane fill the lower left of the picture; to the right the fields open out to a belt
+// of trees and the dark line of the woods. The tower frame is ray-cast once, the fields are mapped onto
+// the ground plane once; the crane, cars and lights move.
 // Rendered as ASCII by default (?ascii=0 for the plain version, ?res=<glyph rows>).
 function createVigil({ w, h, rng }) {
   const { noise2, fbm } = makeNoise(rng);
   const u = Math.min(w, h);
   const portrait = h > w;
   const TAU = Math.PI * 2;
-  const hy = Math.round(h * (portrait ? 0.4 : 0.42)); // horizon = eye level
+  const hy = Math.round(h * (portrait ? 0.22 : 0.26)); // horizon = eye level
   const lw = (k) => Math.max(1, u * k);
   const H = hexToRgb;
   const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
@@ -24,20 +26,42 @@ function createVigil({ w, h, rng }) {
   let now = 0;
 
   // ---------- world (metres): X right, Y up, Z away from the viewer ----------
-  const NX = 5, NZ = 3, BAY = 4.8, FH = 3.2, FLOORS = portrait ? 16 : 14;
+  // A long slab block, twelve bays long and four deep
+  const NX = 12, NZ = 4, BAY = 4.8, FH = 3.2, FLOORS = 14;
   const W = NX * BAY, D = NZ * BAY, TOP = FLOORS * FH;
-  const center = [W / 2, 0, D / 2];
-  const R = 140, yaw = 0.62, eye = 20;
+  // The camera: a window across the way, a little above the roof (higher on a phone), looking past
+  // the tower's near corner so its long face runs off to the left
+  const yaw = 0.45, eye = TOP + (portrait ? 17 : 12);
   const fwd = [-Math.sin(yaw), 0, Math.cos(yaw)], right = [Math.cos(yaw), 0, Math.sin(yaw)];
-  const cam = [center[0] + R * Math.sin(yaw), eye, center[2] - R * Math.cos(yaw)];
-  const F = (h * (portrait ? 0.34 : 0.45) * R) / TOP;
-  const sx0 = w * (portrait ? 0.5 : 0.56);
+  const cam = [W + 30, eye, -75];
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  // Frame it so the roof's near corner sits just below the middle of the screen, left of centre
+  const corner = [W - cam[0], TOP - cam[1], -cam[2]];
+  const F = ((h * (portrait ? 0.45 : 0.5) - hy) * dot(corner, fwd)) / (eye - TOP);
+  const sx0 = w * (portrait ? 0.62 : 0.52) - (F * dot(corner, right)) / dot(corner, fwd);
   function project(p) {
     const d = [p[0] - cam[0], p[1] - cam[1], p[2] - cam[2]];
     const z = dot(d, fwd);
     return [sx0 + (F * dot(d, right)) / z, hy - (F * d[1]) / z, z];
   }
+
+  // The country road behind the site, at a slight angle to the view
+  const roadP = [cam[0] + fwd[0] * 170, 0, cam[2] + fwd[2] * 170];
+  const rAng = Math.atan2(right[2], right[0]) - 0.12;
+  const rd = [Math.cos(rAng), Math.sin(rAng)], rn = [-rd[1], rd[0]];
+  const toRoad = (X, Z) => {
+    const dx = X - roadP[0], dz = Z - roadP[2];
+    return [dx * rd[0] + dz * rd[1], dx * rn[0] + dz * rn[1]];
+  };
+  const nearSide = Math.sign(toRoad(cam[0], cam[2])[1]);
+  const roadPoint = (a, b, y = 0) => [roadP[0] + rd[0] * a + rn[0] * b, y, roadP[2] + rd[1] * a + rn[1] * b];
+  // Where the line `b` metres off the road crosses X
+  const alongAt = (X, b) => (X - roadP[0] - rn[0] * b) / rd[0];
+  // The site: from the front of the tower back to a fence along the road, gate and cabin by the road
+  const SITE_X0 = -14, SITE_X1 = W + 30, SITE_Z0 = -40, BACK = nearSide * 9;
+  const backL = roadPoint(alongAt(SITE_X0, BACK), BACK), backR = roadPoint(alongAt(SITE_X1, BACK), BACK);
+  const gateA = alongAt(W + 12, BACK);
+  const gate = roadPoint(gateA, BACK), gateFoot = roadPoint(gateA, nearSide * 3.3);
 
   // Frame: columns (a few stop a floor short), slabs (the top one half poured), brick infill below
   const boxes = [];
@@ -53,19 +77,28 @@ function createVigil({ w, h, rng }) {
     const xr = f === FLOORS ? W * 0.55 : W;
     boxes.push({ a: [-0.45, f * FH - 0.34, -0.45], b: [xr + 0.45, f * FH, D + 0.45], kind: 0 });
   }
-  for (let f = 0; f < 5; f++) {
-    for (let i = 0; i < NX; i++) {
-      if (rng() < 0.75) boxes.push({ a: [i * BAY, f * FH, -0.12], b: [(i + 1) * BAY, (f + 1) * FH, 0.12], kind: 1 });
+  // Infill climbs higher at the far end, where work started
+  for (let i = 0; i < NX; i++) {
+    const top = 4 + Math.round((1 - i / NX) * 4 + rng() * 2);
+    for (let f = 1; f < top; f++) {
+      if (rng() < 0.8) boxes.push({ a: [i * BAY, f * FH, -0.12], b: [(i + 1) * BAY, (f + 1) * FH, 0.12], kind: 1 });
     }
+  }
+  for (let f = 1; f < 5; f++) {
     for (let j = 0; j < NZ; j++) {
       if (rng() < 0.75) boxes.push({ a: [W - 0.12, f * FH, j * BAY], b: [W + 0.12, (f + 1) * FH, (j + 1) * BAY], kind: 1 });
     }
   }
 
-  // The watchman's cabin by the gate, and materials stacked on a few slabs
-  boxes.push({ a: [-17, 0, -7], b: [-10.5, 2.7, -4.4], kind: 2 });
-  for (const [x, f, z, sx, sy, sz] of [[W - 4.2, 5, 0.9, 1.2, 0.8, 1.0], [2.2, 7, 1.4, 3.6, 0.35, 0.6], [W - 2.4, 9, 2.2, 1.1, 0.9, 1.1], [6.5, 4, 0.9, 1.2, 0.7, 1.0]]) {
+  // The watchman's cabin by the gate; materials stacked on a few slabs and out in the yard
+  const cab = roadPoint(gateA + 8, nearSide * 15);
+  boxes.push({ a: [cab[0] - 3.2, 0, cab[2] - 1.3], b: [cab[0] + 3.2, 2.7, cab[2] + 1.3], kind: 2 });
+  for (const [x, f, z, sx, sy, sz] of [[W - 4.2, 5, 0.9, 1.2, 0.8, 1.0], [2.2, 7, 1.4, 3.6, 0.35, 0.6], [W - 2.4, 9, 2.2, 1.1, 0.9, 1.1], [6.5, 4, 0.9, 1.2, 0.7, 1.0], [W * 0.5, 11, 1.1, 1.3, 0.8, 1.2], [W * 0.3, 12, 2.0, 3.4, 0.3, 0.7]]) {
     boxes.push({ a: [x, f * FH, z], b: [x + sx, f * FH + sy, z + sz], kind: 3 });
+  }
+  for (const [da, db, sx, sy, sz] of [[-6, 20, 4, 1.1, 2.4], [-12, 24, 2.4, 1.6, 2.4], [-3, 30, 6, 0.6, 1.4], [4, 26, 2.4, 1.2, 2.4]]) {
+    const q = roadPoint(gateA + da, nearSide * db);
+    boxes.push({ a: [q[0], 0, q[2]], b: [q[0] + sx, sy, q[2] + sz], kind: 3 });
   }
 
   // Ray-cast the frame once into its own layer
@@ -74,10 +107,20 @@ function createVigil({ w, h, rng }) {
   const frame = mk(w, h);
   {
     const fx = frame.getContext('2d');
+    // Each box's screen footprint, binned into tiles so a pixel only tests the boxes that can cover it
+    const TS = 24, tw = Math.ceil(w / TS), th = Math.ceil(h / TS);
+    const tiles = Array.from({ length: tw * th }, () => []);
     let x0 = w, x1 = 0, y0 = h, y1 = 0;
-    for (const bx of boxes) for (const x of [bx.a[0], bx.b[0]]) for (const y of [bx.a[1], bx.b[1]]) for (const z of [bx.a[2], bx.b[2]]) {
-      const [sx, sy] = project([x, y, z]);
-      x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+    for (const bx of boxes) {
+      let bx0 = w, bx1 = 0, by0 = h, by1 = 0;
+      for (const x of [bx.a[0], bx.b[0]]) for (const y of [bx.a[1], bx.b[1]]) for (const z of [bx.a[2], bx.b[2]]) {
+        const [sx, sy] = project([x, y, z]);
+        bx0 = Math.min(bx0, sx); bx1 = Math.max(bx1, sx); by0 = Math.min(by0, sy); by1 = Math.max(by1, sy);
+      }
+      x0 = Math.min(x0, bx0); x1 = Math.max(x1, bx1); y0 = Math.min(y0, by0); y1 = Math.max(y1, by1);
+      for (let ty = Math.max(0, Math.floor(by0 / TS)); ty <= Math.min(th - 1, Math.floor(by1 / TS)); ty++) {
+        for (let tx = Math.max(0, Math.floor(bx0 / TS)); tx <= Math.min(tw - 1, Math.floor(bx1 / TS)); tx++) tiles[ty * tw + tx].push(bx);
+      }
     }
     x0 = Math.max(0, Math.floor(x0)); x1 = Math.min(w - 1, Math.ceil(x1));
     y0 = Math.max(0, Math.floor(y0)); y1 = Math.min(h - 1, Math.ceil(y1));
@@ -91,7 +134,7 @@ function createVigil({ w, h, rng }) {
         const dl = Math.hypot(d[0], d[1], d[2]);
         d[0] /= dl; d[1] /= dl; d[2] /= dl;
         let best = 1e9, hit = null, axis = 0, sign = 0;
-        for (const bx of boxes) {
+        for (const bx of tiles[Math.floor((y0 + py) / TS) * tw + Math.floor((x0 + px) / TS)]) {
           let tmin = 0, tmax = 1e9, ax2 = -1, sg = 0, miss = false;
           for (let k = 0; k < 3; k++) {
             const inv = 1 / d[k];
@@ -186,7 +229,7 @@ function createVigil({ w, h, rng }) {
     fx.stroke();
     poly([[hx + 1.6, 6 * FH, hz - 1.4], [hx + 1.6, 6 * FH, hz + 1.4], [hx + 1.6, 6 * FH + 2.6, hz + 1.4], [hx + 1.6, 6 * FH + 2.6, hz - 1.4]], '#3a4250');
     // A parked excavator: tracks, body, cab, and its arm folded down to the ground
-    const E = [W + 6, 0, -14];
+    const E = roadPoint(gateA - 20, nearSide * 22);
     poly([[E[0] - 2.6, 0, E[2]], [E[0] + 2.6, 0, E[2]], [E[0] + 2.4, 1, E[2]], [E[0] - 2.4, 1, E[2]]], '#1b1d1b');
     poly([[E[0] - 2, 1, E[2] + 0.2], [E[0] + 1.6, 1, E[2] + 0.2], [E[0] + 1.6, 2.4, E[2] + 0.2], [E[0] - 2, 2.4, E[2] + 0.2]], '#2c2b22');
     poly([[E[0] - 2, 2.4, E[2] + 0.3], [E[0] - 0.6, 2.4, E[2] + 0.3], [E[0] - 0.6, 3.9, E[2] + 0.3], [E[0] - 1.8, 3.9, E[2] + 0.3]], '#2c2b22');
@@ -201,18 +244,6 @@ function createVigil({ w, h, rng }) {
   }
 
   // ---------- the land: fields, a country road, the site's bare earth, woods ----------
-  const roadP = [cam[0] + fwd[0] * 72, 0, cam[2] + fwd[2] * 72];
-  const rAng = Math.atan2(right[2], right[0]) - 0.12;
-  const rd = [Math.cos(rAng), Math.sin(rAng)], rn = [-rd[1], rd[0]];
-  const toRoad = (X, Z) => {
-    const dx = X - roadP[0], dz = Z - roadP[2];
-    return [dx * rd[0] + dz * rd[1], dx * rn[0] + dz * rn[1]];
-  };
-  const nearSide = Math.sign(toRoad(cam[0], cam[2])[1]);
-  const roadPoint = (a, b, y = 0) => [roadP[0] + rd[0] * a + rn[0] * b, y, roadP[2] + rd[1] * a + rn[1] * b];
-  // The site's access track runs from the gate out to the road
-  const gate = [W * 0.4, 0, -12];
-  const gateFoot = roadPoint(toRoad(gate[0], gate[2])[0], 0);
   const sm = (e0, e1, x) => {
     const k = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
     return k * k * (3 - 2 * k);
@@ -245,7 +276,7 @@ function createVigil({ w, h, rng }) {
       if (dTrack < 1.9) {
         c = [34, 31, 26];
         if (Math.abs(dTrack - 0.9) < 0.22) c = lerp(c, [44, 40, 34], fade);
-      } else if (X > -14 && X < W + 22 && Z > -12 && Z < D + 14) {
+      } else if (X > SITE_X0 && X < SITE_X1 && Z > SITE_Z0 && b * nearSide > 9) {
         c = lerp([28, 26, 22], [36, 33, 28], noise2(X * 0.15, Z * 0.15) + 0.5); // bare earth of the site
       } else {
         // Fields: road-aligned parcels, staggered, with dark hedgerows between
@@ -334,6 +365,14 @@ function createVigil({ w, h, rng }) {
         trees.push([c[0] + Math.cos(a) * r * 55, c[1] + Math.sin(a) * r * 28, 3.5 + rng() * 2.5, 7 + rng() * 3]);
       }
     }
+    // A shelter belt along a field edge beyond the road: two staggered rows, with the odd gap
+    for (let a = -260; a < 700; a += 4.5 + rng() * 2) {
+      if (noise2(a * 0.02, 5.5) < -0.28) continue;
+      for (const row of [0, 4]) {
+        const q = roadPoint(a + row * 0.6 + rng(), -nearSide * (88 + row + rng() * 2));
+        trees.push([q[0], q[2], 3 + rng() * 2.2, 8 + rng() * 4]);
+      }
+    }
     trees
       .map(([X, Z, r, y]) => [project([X, y, Z]), project([X, 0, Z]), r])
       .filter(([p]) => p[2] > 1)
@@ -391,8 +430,15 @@ function createVigil({ w, h, rng }) {
   let nextCarAt = 1, firstCar = true;
   let plane = null, nextPlane = 14;
 
-  // Crane, netting, hoarding: positions in the same world
-  const M = [W + 8, 0, D * 0.95], MH = TOP * 1.15, MS = 1.8, JIB = 46, CJIB = 14;
+  // The crane stands between us and the tower: its mast runs down the left edge of the picture with
+  // the cab near the top, and its flat-top jib reaches out over the roof
+  const zm = portrait ? 70 : 55;
+  const mx = ((w * (portrait ? 0.1 : 0.095) - sx0) * zm) / F;
+  const M = [cam[0] + fwd[0] * zm + right[0] * mx, 0, cam[2] + fwd[2] * zm + right[2] * mx];
+  const MH = eye + ((hy - h * (portrait ? 0.08 : 0.1)) * zm) / F, MS = 2, CJIB = 16;
+  const aim = [W * 0.8, 0, D * 0.5];
+  const jibAim = Math.atan2(aim[2] - M[2], aim[0] - M[0]);
+  const JIB = Math.hypot(aim[0] - M[0], aim[2] - M[2]) + 8;
   const cranePhase = rng() * 10;
 
   // ---------- sky and distance ----------
@@ -536,18 +582,32 @@ function createVigil({ w, h, rng }) {
     }
   }
 
-  function drawHoarding(ctx) {
-    const pts = [[-12, -10], [W + 20, -10], [W + 20, D + 12]];
-    ctx.fillStyle = 'rgba(16,20,26,0.9)';
-    for (let k = 0; k < pts.length - 1; k++) {
-      const [ax, az] = pts[k], [bx, bz] = pts[k + 1];
-      quad(ctx, [[ax, 0, az], [bx, 0, bz], [bx, 2.2, bz], [ax, 2.2, az]]);
+  // Scaffold with cross bracing up the dark face, by the near corner
+  function drawSideScaffold(ctx) {
+    const x = W + 1.4, z1 = D * 0.45;
+    ctx.strokeStyle = '#323b4a';
+    ctx.lineWidth = lw(0.0011);
+    ctx.beginPath();
+    for (const z of [0, z1 / 2, z1]) line(ctx, [x, 0, z], [x, TOP - FH, z]);
+    for (let f = 0; f < FLOORS - 1; f++) {
+      line(ctx, [x, f * FH, 0], [x, f * FH, z1]);
+      line(ctx, [x, f * FH, 0], [x, (f + 1) * FH, z1 / 2]);
+      line(ctx, [x, (f + 1) * FH, 0], [x, f * FH, z1 / 2]);
+      line(ctx, [x, f * FH, z1 / 2], [x, (f + 1) * FH, z1]);
+      line(ctx, [x, (f + 1) * FH, z1 / 2], [x, f * FH, z1]);
     }
+    ctx.stroke();
+  }
+
+  function drawHoarding(ctx) {
+    const g0 = roadPoint(gateA - 3, BACK), g1 = roadPoint(gateA + 3, BACK);
+    const runs = [[[SITE_X1, SITE_Z0], [backR[0], backR[2]]], [[backR[0], backR[2]], [g1[0], g1[2]]], [[g0[0], g0[2]], [backL[0], backL[2]]]];
+    ctx.fillStyle = 'rgba(16,20,26,0.9)';
+    for (const [[ax, az], [bx, bz]] of runs) quad(ctx, [[ax, 0, az], [bx, 0, bz], [bx, 2.2, bz], [ax, 2.2, az]]);
     ctx.strokeStyle = '#262d38';
     ctx.lineWidth = lw(0.0011);
     ctx.beginPath();
-    for (let k = 0; k < pts.length - 1; k++) {
-      const [ax, az] = pts[k], [bx, bz] = pts[k + 1];
+    for (const [[ax, az], [bx, bz]] of runs) {
       line(ctx, [ax, 2.2, az], [bx, 2.2, bz]);
       const n = Math.round(Math.hypot(bx - ax, bz - az) / 3);
       for (let i = 0; i <= n; i++) {
@@ -558,57 +618,97 @@ function createVigil({ w, h, rng }) {
     ctx.stroke();
   }
 
-  // The crane, in the same world, weathervaning slowly; returns its light positions
+  // A box drawn as the faces that face us, shaded like the frame. o is a corner, ex/ey/ez its edges
+  function solid(ctx, o, ex, ey, ez, base) {
+    const P = (i, j, k) => [0, 1, 2].map((n) => o[n] + ex[n] * i + ey[n] * j + ez[n] * k);
+    const faces = [
+      [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], ez, -1], [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1], ez, 1],
+      [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0], ex, -1], [[1, 0, 0], [1, 0, 1], [1, 1, 1], [1, 1, 0], ex, 1],
+      [[0, 1, 0], [1, 1, 0], [1, 1, 1], [0, 1, 1], ey, 1], [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1], ey, -1],
+    ];
+    for (const [a, b, c, d, axis, sg] of faces) {
+      const n = axis.map((v) => v * sg), nl = Math.hypot(...n);
+      const pa = P(...a);
+      if (dot(n, [cam[0] - pa[0], cam[1] - pa[1], cam[2] - pa[2]]) <= 0) continue;
+      const k = 0.3 + 0.8 * Math.max(0, dot(n, LIGHT) / nl);
+      ctx.fillStyle = rgb(base.map((v) => v * k));
+      quad(ctx, [pa, P(...b), P(...c), P(...d)]);
+    }
+  }
+
+  // The crane, slewing slowly; returns its light positions
   function drawCrane(ctx, t) {
-    const s = Math.PI + 0.55 * Math.sin(t * 0.012 + cranePhase) + 0.15 * noise2(t * 0.02, cranePhase);
+    const s = jibAim + 0.12 * Math.sin(t * 0.012 + cranePhase) + 0.05 * noise2(t * 0.02, cranePhase);
     const dir = [Math.cos(s), 0, Math.sin(s)], side = [-dir[2], 0, dir[0]];
     const at = (along, lat, y) => [M[0] + dir[0] * along + side[0] * lat, y, M[2] + dir[2] * along + side[2] * lat];
-    ctx.strokeStyle = '#46505f';
-    ctx.lineWidth = lw(0.0013);
-    ctx.beginPath();
-    // Mast: four corner posts with bracing on the two faces we see
+    const thick = (m, p) => Math.max(1, (F * m) / project(p)[2]);
     const c = MS / 2;
-    for (const [dx, dz] of [[-c, -c], [c, -c], [c, c], [-c, c]]) line(ctx, [M[0] + dx, 0, M[2] + dz], [M[0] + dx, MH, M[2] + dz]);
-    for (let y = 0, k = 0; y < MH - MS; y += MS, k++) {
+    const corners = [[-c, -c], [c, -c], [c, c], [-c, c]];
+    ctx.strokeStyle = '#4a5463';
+    // Mast: four corner posts, then rungs and diagonals on the two faces we see
+    ctx.lineWidth = thick(0.2, [M[0], eye, M[2]]);
+    ctx.beginPath();
+    for (const [dx, dz] of corners) line(ctx, [M[0] + dx, 0, M[2] + dz], [M[0] + dx, MH - 1.2, M[2] + dz]);
+    ctx.stroke();
+    ctx.lineWidth = thick(0.09, [M[0], eye, M[2]]);
+    ctx.beginPath();
+    for (let y = 0, k = 0; y < MH - MS - 1.2; y += MS, k++) {
       const a = k % 2 ? -c : c;
+      line(ctx, [M[0] - c, y, M[2] - c], [M[0] + c, y, M[2] - c]);
+      line(ctx, [M[0] + c, y, M[2] - c], [M[0] + c, y, M[2] + c]);
       line(ctx, [M[0] + a, y, M[2] - c], [M[0] - a, y + MS, M[2] - c]);
       line(ctx, [M[0] + c, y, M[2] + a], [M[0] + c, y + MS, M[2] - a]);
     }
-    // Jib: triangular truss, two bottom chords and one top chord, with diagonals
-    line(ctx, at(0, -0.8, MH), at(JIB, -0.4, MH));
-    line(ctx, at(0, 0.8, MH), at(JIB, 0.4, MH));
-    line(ctx, at(0, 0, MH + 1.6), at(JIB * 0.97, 0, MH + 0.35));
-    const n = 22;
+    ctx.stroke();
+    // Slewing ring and turntable on top of the mast
+    solid(ctx, at(-1.6, -1.6, MH - 1.2), dir.map((v) => v * 3.2), [0, 1.2, 0], side.map((v) => v * 3.2), [52, 60, 72]);
+    // Jib: a flat-top truss, two bottom chords and a top chord tapering towards the tip, with diagonals
+    ctx.lineWidth = thick(0.13, at(JIB * 0.4, 0, MH));
+    ctx.beginPath();
+    line(ctx, at(-CJIB, -0.9, MH), at(JIB, -0.4, MH));
+    line(ctx, at(-CJIB, 0.9, MH), at(JIB, 0.4, MH));
+    line(ctx, at(0, 0, MH + 1.8), at(JIB, 0, MH + 0.8));
+    ctx.stroke();
+    ctx.lineWidth = thick(0.07, at(JIB * 0.4, 0, MH));
+    ctx.beginPath();
+    const n = 26;
     for (let i = 0; i < n; i++) {
       const a = (JIB * i) / n, b = (JIB * (i + 1)) / n;
-      const ya = MH + 1.6 - (1.25 * i) / n, yb = MH + 1.6 - (1.25 * (i + 1)) / n;
-      line(ctx, at(a, 0, ya), at(b, i % 2 ? 0.6 : -0.6, MH));
-      line(ctx, at(b, i % 2 ? 0.6 : -0.6, MH), at(b, 0, yb));
+      const ya = MH + 1.8 - (1.0 * i) / n, yb = MH + 1.8 - (1.0 * (i + 1)) / n;
+      const la = 0.9 - (0.5 * i) / n, lb = 0.9 - (0.5 * (i + 1)) / n;
+      line(ctx, at(a, 0, ya), at(b, i % 2 ? lb : -lb, MH));
+      line(ctx, at(b, i % 2 ? lb : -lb, MH), at(b, 0, yb));
+      line(ctx, at(a, -la, MH), at(a, la, MH));
     }
-    // Counter-jib, tower head and the tie bars
-    line(ctx, at(0, -0.8, MH), at(-CJIB, -0.8, MH));
-    line(ctx, at(0, 0.8, MH), at(-CJIB, 0.8, MH));
-    const apex = [M[0], MH + 7, M[2]];
-    for (const [dx, dz] of [[-c, -c], [c, -c], [c, c], [-c, c]]) line(ctx, [M[0] + dx, MH, M[2] + dz], apex);
-    line(ctx, apex, at(JIB * 0.62, 0, MH + 0.9));
-    line(ctx, apex, at(-CJIB, 0, MH + 0.3));
+    // Counter-jib rails and their walkway
+    for (let a = 0; a > -CJIB; a -= 2) line(ctx, at(a, -0.9, MH), at(a, 0.9, MH));
     ctx.stroke();
-    // Counterweight blocks and the operator's cab
-    ctx.fillStyle = '#2a313c';
-    quad(ctx, [at(-CJIB + 3.5, -1, MH), at(-CJIB, -1, MH), at(-CJIB, -1, MH - 3), at(-CJIB + 3.5, -1, MH - 3)]);
-    quad(ctx, [[M[0] + c, MH - 3, M[2] - c - 0.1], [M[0] + c + 2.2, MH - 3, M[2] - c - 0.1], [M[0] + c + 2.2, MH - 0.4, M[2] - c - 0.1], [M[0] + c, MH - 0.4, M[2] - c - 0.1]]);
+    // Counterweights at the back, then the operator's cab hung off the turntable, a dim pane in front
+    solid(ctx, at(-CJIB + 0.4, -1.1, MH - 3.4), dir.map((v) => v * 3.4), [0, 3.4, 0], side.map((v) => v * 2.2), [40, 44, 50]);
+    solid(ctx, at(0.6, -3, MH - 3.6), dir.map((v) => v * 2.4), [0, 2.6, 0], side.map((v) => v * 1.9), [58, 66, 78]);
+    ctx.fillStyle = 'rgba(120,150,170,0.28)';
+    quad(ctx, [at(1, -3.01, MH - 2.4), at(2.6, -3.01, MH - 2.4), at(2.6, -3.01, MH - 1.2), at(1, -3.01, MH - 1.2)]);
     // Trolley, cable and hook, swaying a little
-    const trolley = at(JIB * 0.58, 0, MH);
-    const sway = Math.sin(t * 0.7) * 0.5 + noise2(t * 0.3, 7) * 0.5;
-    const hook = [trolley[0] + sway, MH * 0.45, trolley[2]];
-    ctx.strokeStyle = '#535c6a';
+    const trolley = at(JIB * 0.74, 0, MH);
+    const sway = Math.sin(t * 0.7) * 0.4 + noise2(t * 0.3, 7) * 0.4;
+    const hook = [trolley[0] + sway, TOP + 5, trolley[2]];
+    ctx.fillStyle = '#4a5463';
+    quad(ctx, [at(JIB * 0.74 - 0.8, 0, MH - 0.1), at(JIB * 0.74 + 0.8, 0, MH - 0.1), at(JIB * 0.74 + 0.8, 0, MH - 0.6), at(JIB * 0.74 - 0.8, 0, MH - 0.6)]);
+    ctx.strokeStyle = '#59626f';
     ctx.lineWidth = lw(0.0009);
     ctx.beginPath();
-    line(ctx, trolley, hook);
+    for (const o of [-0.25, 0.25]) line(ctx, [trolley[0] + o, MH - 0.5, trolley[2]], [hook[0] + o, hook[1], hook[2]]);
     ctx.stroke();
     ctx.fillStyle = '#46505f';
     quad(ctx, [[hook[0] - 0.6, hook[1], hook[2]], [hook[0] + 0.6, hook[1], hook[2]], [hook[0] + 0.6, hook[1] - 1.2, hook[2]], [hook[0] - 0.6, hook[1] - 1.2, hook[2]]]);
-    return [[...project([apex[0], apex[1] + 0.4, apex[2]]), 0], [...project(at(JIB, 0, MH + 0.2)), 0.35]];
+    // A short pole on the turntable carries the top light
+    const pole = [M[0], MH + 2.6, M[2]];
+    ctx.strokeStyle = '#4a5463';
+    ctx.lineWidth = thick(0.08, pole);
+    ctx.beginPath();
+    line(ctx, [M[0], MH, M[2]], pole);
+    ctx.stroke();
+    return [[...project([pole[0], pole[1] + 0.2, pole[2]]), 0], [...project(at(JIB, 0, MH + 0.9)), 0.35]];
   }
 
   function draw(ctx, layered) {
@@ -653,11 +753,12 @@ function createVigil({ w, h, rng }) {
         ctx.fillRect(plane.x - lw(0.006), plane.y, lw(0.0025), lw(0.0025));
       }
     }
-    ctx.drawImage(frame, 0, 0);
     ctx.drawImage(poleLayer, 0, 0);
     for (const c of cars) drawCar(ctx, c);
-    // A bare bulb left burning inside the sixth floor, warming the concrete around it
-    const bulb = project([W * 0.62, 6 * FH + 2.3, D * 0.3]);
+    drawHoarding(ctx);
+    ctx.drawImage(frame, 0, 0);
+    // A bare bulb left burning inside the ninth floor, warming the concrete around it
+    const bulb = project([W * 0.7, 9 * FH + 2.3, D * 0.3]);
     const flick = 0.85 + 0.15 * noise2(t * 3, 1.7);
     ctx.globalCompositeOperation = 'source-atop';
     let g = ctx.createRadialGradient(bulb[0], bulb[1], 0, bulb[0], bulb[1], u * 0.06);
@@ -672,9 +773,9 @@ function createVigil({ w, h, rng }) {
     ctx.fillStyle = g;
     ctx.fillRect(bulb[0] - u * 0.014, bulb[1] - u * 0.014, u * 0.028, u * 0.028);
     drawScaffold(ctx, t);
+    drawSideScaffold(ctx);
     const lights = drawCrane(ctx, t);
     lights.push([...project([W, TOP + 0.6, 0]), 0.12]);
-    drawHoarding(ctx);
 
     // Red warning lights: tint the steel and concrete around them, then the glow itself
     ctx.globalCompositeOperation = 'source-atop';
