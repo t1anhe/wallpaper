@@ -43,4 +43,4 @@ jobs:
           gh release create mac-latest build/Wallpaper.zip \
             --target "${{ github.sha }}" \
             --title "Wallpaper for Mac (build ${{ github.run_number }})" \
-            --notes "一键安装：在「终端」里运行 curl -fsSL https://raw.githubusercontent.com/t1anhe/wallpaper/claude/affectionate-hamilton-in1kmo/mac/install.sh | bash 。也可以下载 Wallpaper.zip 手动安装（第一次打开需要在 系统设置 → 隐私与安全性 里点「仍要打开」）。装好后会自动更新。壁纸文件夹：~/Wallpaper"
+            --notes "Install with one line in Terminal: curl -fsSL https://raw.githubusercontent.com/t1anhe/wallpaper/claude/affectionate-hamilton-in1kmo/mac/install.sh | bash — or download Wallpaper.zip, unzip it into Applications, and the first time click Open Anyway in System Settings → Privacy & Security. The app updates itself after that. Wallpaper folder: ~/Wallpaper"

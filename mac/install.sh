@@ -12,7 +12,7 @@ mkdir -p "$DEST"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "→ 下载 Wallpaper…"
+echo "→ Downloading Wallpaper…"
 curl -fL --progress-bar "$URL" -o "$TMP/Wallpaper.zip"
 ditto -x -k "$TMP/Wallpaper.zip" "$TMP"
 
@@ -26,4 +26,4 @@ mv "$TMP/Wallpaper.app" "$DEST/Wallpaper.app"
 xattr -dr com.apple.quarantine "$DEST/Wallpaper.app" 2>/dev/null || true
 
 open "$DEST/Wallpaper.app"
-echo "✓ 已安装到 $DEST/Wallpaper.app，菜单栏会出现 ✦ 图标。壁纸文件夹：~/Wallpaper"
+echo "✓ Installed to $DEST/Wallpaper.app. Look for the ✦ icon in the menu bar. Wallpaper folder: ~/Wallpaper"

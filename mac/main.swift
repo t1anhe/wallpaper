@@ -80,17 +80,18 @@ func installBundledWallpapers() {
         }
     }
     let readme = """
-    Wallpaper 壁纸文件夹
+    Wallpaper folder
 
-    把壁纸文件放进这个文件夹（或任意子文件夹），点开菜单栏的 Wallpaper 图标就能看到并切换：
-      · 网页动态壁纸：.html（可以引用同文件夹里的 .js / 图片等文件）
-      · 视频：.mp4 .mov .m4v（静音循环播放）
-      · 图片：.jpg .png .heic .gif .webp
+    Put wallpaper files in this folder (or any subfolder) and they show up in the menu
+    of the Wallpaper icon in the menu bar:
+      · web wallpapers: .html (may load .js files and images next to them)
+      · videos: .mp4 .mov .m4v (muted, looping)
+      · images: .jpg .png .heic .gif .webp
 
-    lib 文件夹是内置动态壁纸共用的脚本，请不要删除。
-    App 更新时会刷新自带的壁纸文件，你自己放进来的文件不会被改动。
+    The lib folder holds scripts shared by the bundled live wallpapers; please keep it.
+    App updates refresh the bundled wallpapers; files you add yourself are never touched.
     """
-    try? readme.write(to: wallpaperDir.appendingPathComponent("使用说明.txt"), atomically: true, encoding: .utf8)
+    try? readme.write(to: wallpaperDir.appendingPathComponent("README.txt"), atomically: true, encoding: .utf8)
     defaults.set(version, forKey: "installedVersion")
 }
 
@@ -237,7 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var asleep = false
     private var lastPointer: TimeInterval = 0
     private var mouseMonitor: Any?
-    private var updateStatus = "版本 build \(currentBuild)"
+    private var updateStatus = "Version: build \(currentBuild)"
     private var updating = false
     private var updateTimer: Timer?
     private let session = URLSession(configuration: .ephemeral)
@@ -250,8 +251,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Bundle.main.bundlePath.contains("/AppTranslocation/") {
             let alert = NSAlert()
-            alert.messageText = "请先把 Wallpaper 拖进「应用程序」文件夹"
-            alert.informativeText = "从「下载」文件夹直接打开时，开机启动等功能无法正常工作。移动后再从「应用程序」里打开即可。"
+            alert.messageText = "Move Wallpaper to your Applications folder first"
+            alert.informativeText = "Opened straight from Downloads, launch at login and updates can't work. Move the app to Applications and open it from there."
             alert.runModal()
         }
         defaults.register(defaults: ["autoUpdate": true])
@@ -320,7 +321,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func handleRelease(_ json: [String: Any]?, status: Int, manual: Bool) {
         guard status == 200, let json = json else {
-            updateStatus = "检查更新失败（网络不通？）"
+            updateStatus = "Couldn't check for updates (offline?)"
             if manual { tell(updateStatus) }
             return
         }
@@ -332,16 +333,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
               let asset = assets.first(where: { ($0["name"] as? String)?.hasSuffix(".zip") == true }),
               let assetURL = asset["url"] as? String
         else {
-            updateStatus = "已是最新版本（build \(currentBuild)）"
+            updateStatus = "Up to date (build \(currentBuild))"
             if manual { tell(updateStatus) }
             return
         }
         guard manual || defaults.bool(forKey: "autoUpdate") else {
-            updateStatus = "有新版本 build \(build)，点「检查更新」安装"
+            updateStatus = "Build \(build) is available. Choose Check for Updates to install"
             return
         }
         updating = true
-        updateStatus = "正在下载 build \(build)…"
+        updateStatus = "Downloading build \(build)…"
         session.downloadTask(with: githubRequest(assetURL, accept: "application/octet-stream")) { tmp, resp, _ in
             let fm = FileManager.default
             let work = fm.temporaryDirectory.appendingPathComponent("WallpaperUpdate-\(UUID().uuidString)")
@@ -360,7 +361,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updating = false
         let fm = FileManager.default
         guard let zip = zip else {
-            updateStatus = "下载更新失败"
+            updateStatus = "Couldn't download the update"
             if manual { tell(updateStatus) }
             return
         }
@@ -377,7 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let current = Bundle.main.bundleURL
         let old = work.appendingPathComponent("previous.app")
         guard unpacked, let fresh = fresh else {
-            updateStatus = "更新包解压失败"
+            updateStatus = "Couldn't unpack the update"
             if manual { tell(updateStatus) }
             return
         }
@@ -391,7 +392,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 throw error
             }
         } catch {
-            updateStatus = "无法替换 App（没有写入「应用程序」文件夹的权限？）"
+            updateStatus = "Couldn't replace the app (no write access to Applications?)"
             if manual { tell(updateStatus) }
             return
         }
@@ -435,7 +436,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for (i, w) in listed.enumerated() {
             if w.kind != lastKind {
                 if lastKind != nil { menu.addItem(.separator()) }
-                let header = NSMenuItem(title: ["动态壁纸", "视频", "图片"][w.kind.rawValue], action: nil, keyEquivalent: "")
+                let header = NSMenuItem(title: ["Live", "Videos", "Images"][w.kind.rawValue], action: nil, keyEquivalent: "")
                 header.isEnabled = false
                 menu.addItem(header)
                 lastKind = w.kind
@@ -448,25 +449,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item)
         }
         if listed.isEmpty {
-            let empty = NSMenuItem(title: "文件夹里还没有壁纸", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: "No wallpapers in the folder yet", action: nil, keyEquivalent: "")
             empty.isEnabled = false
             menu.addItem(empty)
         }
         menu.addItem(.separator())
-        add(to: menu, "随机换一张", #selector(shuffle))
-        add(to: menu, paused ? "继续播放" : "暂停", #selector(togglePause))
-        add(to: menu, "打开壁纸文件夹", #selector(openFolder))
-        add(to: menu, "重新载入", #selector(reload))
+        add(to: menu, "Shuffle", #selector(shuffle))
+        add(to: menu, paused ? "Resume" : "Pause", #selector(togglePause))
+        add(to: menu, "Open Wallpaper Folder", #selector(openFolder))
+        add(to: menu, "Reload", #selector(reload))
         menu.addItem(.separator())
         let status = NSMenuItem(title: updateStatus, action: nil, keyEquivalent: "")
         status.isEnabled = false
         menu.addItem(status)
-        add(to: menu, "检查更新", #selector(checkNow))
-        add(to: menu, "自动更新", #selector(toggleAutoUpdate)).state = defaults.bool(forKey: "autoUpdate") ? .on : .off
+        add(to: menu, "Check for Updates", #selector(checkNow))
+        add(to: menu, "Automatic Updates", #selector(toggleAutoUpdate)).state = defaults.bool(forKey: "autoUpdate") ? .on : .off
         menu.addItem(.separator())
-        add(to: menu, "开机自动启动", #selector(toggleLogin)).state = LoginItem.isEnabled ? .on : .off
+        add(to: menu, "Launch at Login", #selector(toggleLogin)).state = LoginItem.isEnabled ? .on : .off
         menu.addItem(.separator())
-        add(to: menu, "退出 Wallpaper", #selector(quit), key: "q")
+        add(to: menu, "Quit Wallpaper", #selector(quit), key: "q")
     }
 
     @discardableResult
