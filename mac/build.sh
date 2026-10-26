@@ -24,9 +24,9 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns build/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 
-# Bundled wallpapers: the live pages with their shared scripts, plus the static set
+# Bundled wallpapers: the live pages with their shared scripts, plus the static set in ASCII
 cp -R lib live "$APP/Contents/Resources/Wallpapers/"
-for f in output/static/*-desktop.jpg; do
+for f in output/static/ascii/*-desktop.jpg; do
   cp "$f" "$APP/Contents/Resources/Wallpapers/images/$(basename "$f" -desktop.jpg).jpg"
 done
 

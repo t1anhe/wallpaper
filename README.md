@@ -68,6 +68,7 @@ Notes:
 - Every display shows the wallpaper. Pointer movement is forwarded to web wallpapers, so the koi still flee from the mouse.
 - Playback pauses while the screens sleep or the session is locked.
 - The bundled wallpapers are copied into `~/Wallpaper` on first launch and refreshed on every update. Files you add yourself are never touched.
+- The images bundled with the app are the ASCII versions of the static set.
 - Requires macOS 12 or later, on Intel or Apple silicon.
 - The source is in `mac/`. Pushing changes to `mac/`, `live/` or `lib/` makes GitHub Actions rebuild the app on a macOS runner and refresh the `mac-latest` release, and installed copies update to it.
 
