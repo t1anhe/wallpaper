@@ -123,7 +123,7 @@ function createShoal({ w, h, rng, params }) {
       const nx = -(b[1] - a[1]) / len;
       const ny = (b[0] - a[0]) / len;
       const s = k / (N - 1);
-      const wig = f.W * cs * 0.28 * Math.pow(s, 1.5) * Math.sin(s * 7 - t * (3 + f.speed * 0.9) + f.phase);
+      const wig = f.W * cs * 0.22 * Math.pow(s, 1.5) * Math.sin(s * 5 - t * (1.6 + f.speed * 0.25) + f.phase);
       out.push({ x: pts[k][0] + nx * wig, y: pts[k][1] + ny * wig, nx, ny, s });
     }
     return out;
@@ -154,16 +154,19 @@ function createShoal({ w, h, rng, params }) {
       }
       let desired = Math.atan2(vy, vx) + noise2(t * 0.35, f.id * 11) * 0.5;
       let speed = f.base * (0.7 + 0.6 * (noise2(t * 0.3, f.id + 50) + 0.5));
+      // Only fish near the pointer react, and they ease into fleeing rather than snapping round.
+      let flee = 0;
       if (input.active) {
         const dx = f.x - input.x, dy = f.y - input.y;
         const d = Math.hypot(dx, dy);
         if (d < cs * 20) {
-          desired = Math.atan2(dy, dx);
-          speed *= 1 + 2 * (1 - d / (cs * 20));
+          flee = 1 - d / (cs * 20);
+          desired += wrap(Math.atan2(dy, dx) - desired) * Math.min(1, flee * 1.5);
+          speed *= 1 + 1.5 * flee;
         }
       }
       f.speed += (speed - f.speed) * Math.min(1, dt * 2);
-      const turn = (input.active ? 1.6 : 0.65) * dt;
+      const turn = (0.65 + 1.1 * flee) * dt;
       f.heading += Math.max(-turn, Math.min(turn, wrap(desired - f.heading)));
       f.x += Math.cos(f.heading) * f.speed * cs * dt;
       f.y += Math.sin(f.heading) * f.speed * cs * dt;
@@ -287,7 +290,7 @@ function createShoal({ w, h, rng, params }) {
           } else if (owner[idx] < 0) {
             // Pectoral fins: a flapping fringe of ray glyphs just behind the head.
             const fin = bs > 0.18 && bs < 0.42 ? Math.sin(((bs - 0.18) / 0.24) * Math.PI) : 0;
-            const finW = fin * f.W * cs * (0.45 + 0.25 * Math.sin(t * 5 + f.phase));
+            const finW = fin * f.W * cs * (0.45 + 0.25 * Math.sin(t * 2.2 + f.phase));
             if (d < half + finW) {
               const fade = 1 - (d - half) / (finW + 1);
               ctx.fillStyle = rgba(f.pal[0], 0.25 + 0.3 * fade);
@@ -299,7 +302,7 @@ function createShoal({ w, h, rng, params }) {
             if (d > half + cs * 1.6) continue;
             // Halo: sparse dots that make the silhouette feel like it dissolves into the grid.
             const fade = 1 - (d - half) / (cs * 1.6);
-            if (hash3(c, r, Math.floor(t * 4)) < 0.3 * fade) {
+            if (hash3(c, r, Math.floor(t * 1.2)) < 0.3 * fade) {
               ctx.fillStyle = rgba(f.pal[0], 0.55 * fade);
               ctx.fillText(hash3(r, c) < 0.5 ? '.' : ':', px, py);
             }
@@ -347,13 +350,12 @@ function createShoal({ w, h, rng, params }) {
         let k = (0.72 + 0.34 * Math.sqrt(dep)) * (1 + 0.22 * facing * Math.min(1, Math.abs(l) * 2.2));
         if (head) k *= 0.93;
         if (dorsal) k *= 0.82;
-        k *= 0.95 + hash3(c, r, 3) * 0.1;
         const rgbT = hexToRgb(tile).map((v) => Math.min(255, v * (isEye ? 1 : k)));
         const alpha = tail ? 0.25 + dep * 0.5 : 0.35 + 0.65 * Math.pow(dep, 0.45);
         ctx.fillStyle = rgb(rgbT, alpha);
         ctx.fillRect(px + gap, py + gap, cs - gap * 2, cs - gap * 2);
         // Specular glint along the lit flank
-        if (!tail && facing > 0.4 && dep > 0.35 && dep < 0.65 && hash3(c, r, Math.floor(t * 2)) < 0.25) {
+        if (!tail && facing > 0.55 && dep > 0.4 && dep < 0.6) {
           ctx.fillStyle = 'rgba(255,255,255,0.18)';
           ctx.fillRect(px + gap, py + gap, cs - gap * 2, (cs - gap * 2) * 0.35);
         }
@@ -362,16 +364,14 @@ function createShoal({ w, h, rng, params }) {
         if (isEye) g = 'o';
         else if (tail) g = rayGlyph(ang[idx] + l * 0.9); // fin rays fan out from the peduncle
         else if (gill) g = l > 0 ? ')' : '(';
-        else if (dorsal) g = hash3(c, r) < 0.5 ? '=' : '#';
-        else if (dep < 0.28) g = GLYPHS[Math.floor((dep / 0.28) * 4 + hash3(c, r) * 1.5)];
-        else if (hash3(c, r, Math.floor(t * 6 + fi)) < 0.05) g = GLYPHS[Math.floor(hash3(r, c, t * 6) * GLYPHS.length)];
+        else if (dorsal) g = Math.floor(s * f.L * 0.5) % 2 ? '=' : '#';
+        else if (dep < 0.28) g = GLYPHS[Math.floor((dep / 0.28) * 4)];
         else if (!head) {
           // Scales: offset rows of ( ) pairs laid out along the body
           const row = Math.floor(l * f.W * 1.6 + 0.5);
-          const along = s * f.L * 0.75 + (row & 1) * 0.5;
+          const along = s * f.L * 0.4 + (row & 1) * 0.5;
           g = along - Math.floor(along) < 0.5 ? '(' : ')';
-          if (hash3(c, r, 9) < 0.18) g = 'o';
-        } else g = GLYPHS[Math.min(GLYPHS.length - 1, Math.floor((dep * 0.8 + hash3(c, r) * 0.25) * GLYPHS.length))];
+        } else g = GLYPHS[Math.min(GLYPHS.length - 1, Math.floor((dep * 0.85 + 0.1) * GLYPHS.length))];
 
         const lum = rgbT[0] * 0.3 + rgbT[1] * 0.59 + rgbT[2] * 0.11;
         ctx.fillStyle = lum > 140 ? rgba(theme.inkDark, 0.78) : rgba(theme.inkLight, isEye ? 0.95 : 0.82);

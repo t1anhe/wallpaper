@@ -12,9 +12,11 @@
 | --- | --- | --- |
 | **Shoal** `live/shoal.html` | 字符方块拼成的锦鲤在网格上游动：鳞片、背脊、鳃线、胸鳍尾鳍的鳍条、侧光与投影、胡须、水波。鼠标靠近鱼会被吓跑。 | `?theme=light` 浅色灰调 · `?fish=8` 鱼的数量 |
 | **Isle** `live/isle.html` | 漂浮的方块小岛：小屋冒烟、树叶飘落、池塘、瀑布、云、日月；完整昼夜循环，夜里灯笼/窗户/萤石照亮周围的方块，还有萤火虫。每次打开地形都不一样。 | `?time=day/sunset/night` 固定时间 · `?day=60` 一天多少秒 · `?seed=7` 固定地形 · `?res=200` 字符更细 · `?ascii=0` 方块原版 |
+| **Abyss** `live/abyss.html` | 阳光到不了的深海：黑暗里只有一只发光水母慢慢漂着，触手拖在它游过的路径后面；海洋雪只在它的光里才看得见，远处偶尔一闪微光。鼠标划过会搅起淡淡的荧光。 | `?res=200` 字符更细 · `?ascii=0` 非字符版 |
 
 ![Shoal](output/previews/shoal.jpg)
 ![Isle 日落](output/previews/isle-sunset.jpg)
+![Abyss](output/previews/abyss-desktop.jpg)
 
 ### 十字绣
 
