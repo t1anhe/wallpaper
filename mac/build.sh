@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 VERSION="${VERSION:-1}"
 APP=build/Wallpaper.app
 rm -rf build
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Wallpapers/images"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Wallpapers"
 
 for arch in arm64 x86_64; do
   swiftc -O -target "$arch-apple-macos12.0" -o "build/Wallpaper-$arch" mac/main.swift \
@@ -24,10 +24,13 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns build/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 
-# Bundled wallpapers: the live pages with their shared scripts, plus the static set in ASCII
+# Bundled wallpapers: the live pages with their shared scripts (each names its category), plus the
+# static set in ASCII, filed in folders named after their categories
 cp -R lib live "$APP/Contents/Resources/Wallpapers/"
-for f in output/static/ascii/*-desktop.jpg; do
-  cp "$f" "$APP/Contents/Resources/Wallpapers/images/$(basename "$f" -desktop.jpg).jpg"
+for pair in aurora:Nature dunes:Nature bauhaus:Abstract silk:Abstract topography:Abstract; do
+  name=${pair%%:*} folder=${pair#*:}
+  mkdir -p "$APP/Contents/Resources/Wallpapers/$folder"
+  cp "output/static/ascii/$name-desktop.jpg" "$APP/Contents/Resources/Wallpapers/$folder/$name.jpg"
 done
 
 codesign --force --deep --sign - "$APP"

@@ -1,7 +1,9 @@
 // Wallpaper — a menu bar app that puts live wallpapers behind the desktop icons.
 //
 // Wallpapers live in ~/Wallpaper. Anything dropped in there (or a subfolder) shows up in the menu
-// the next time it is opened: web pages (.html), videos (.mp4/.mov/.m4v) and images.
+// the next time it is opened: web pages (.html), videos (.mp4/.mov/.m4v) and images. The menu files
+// them by category: a web page can name its own (<meta name="category" content="Deep Sea">), anything
+// else takes the name of the folder it is in.
 // The wallpapers bundled with the app are copied in on first launch and refreshed on updates;
 // files the user adds are never touched.
 
@@ -21,18 +23,40 @@ enum Kind: Int {
     case web, video, image
 }
 
+/// "deep-sea" -> "Deep Sea"
+func displayName(_ s: String) -> String {
+    s.split(whereSeparator: { $0 == "-" || $0 == "_" || $0 == " " })
+        .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+        .joined(separator: " ")
+}
+
 struct Wallpaper {
     let path: String  // relative to wallpaperDir
     let kind: Kind
+    let category: String
 
     var url: URL { wallpaperDir.appendingPathComponent(path) }
     var title: String {
-        (path as NSString).lastPathComponent
-            .components(separatedBy: ".").dropLast().joined(separator: ".")
-            .split(whereSeparator: { $0 == "-" || $0 == "_" })
-            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
-            .joined(separator: " ")
+        displayName((path as NSString).lastPathComponent.components(separatedBy: ".").dropLast().joined(separator: "."))
     }
+}
+
+/// Categories in menu order; any others follow alphabetically, then Other.
+let categoryOrder = ["Deep Sea", "Sea", "Nature", "City", "Abstract"]
+
+/// A web page names its category in a <meta name="category"> tag near the top; anything else takes
+/// the name of the folder it is in. Files at the top of the folder go under Other.
+func category(of path: String, kind: Kind) -> String {
+    if kind == .web, let file = FileHandle(forReadingAtPath: wallpaperDir.appendingPathComponent(path).path) {
+        defer { try? file.close() }
+        let head = String(decoding: file.readData(ofLength: 2048), as: UTF8.self)
+        if let tag = head.range(of: #"<meta name="category" content="[^"]+""#, options: .regularExpression),
+           let value = head[tag].range(of: #"content=""#) {
+            return String(head[tag][value.upperBound...].dropLast())
+        }
+    }
+    let parts = path.split(separator: "/")
+    return parts.count > 1 && parts[0] != "live" ? displayName(String(parts[0])) : "Other"
 }
 
 func kind(of path: String) -> Kind? {
@@ -52,8 +76,12 @@ func scanWallpapers() -> [Wallpaper] {
             // lib/ holds shared scripts; hidden files and deep nesting are noise
             return parts.first != "lib" && !parts.contains { $0.hasPrefix(".") } && parts.count <= 4
         }
-        .compactMap { path in kind(of: path).map { Wallpaper(path: path, kind: $0) } }
-        .sorted { ($0.kind.rawValue, $0.title.lowercased()) < ($1.kind.rawValue, $1.title.lowercased()) }
+        .compactMap { path in kind(of: path).map { Wallpaper(path: path, kind: $0, category: category(of: path, kind: $0)) } }
+        .sorted { (rank($0.category), $0.category, $0.title.lowercased()) < (rank($1.category), $1.category, $1.title.lowercased()) }
+}
+
+func rank(_ category: String) -> Int {
+    categoryOrder.firstIndex(of: category) ?? (category == "Other" ? 2000 : 1000)
 }
 
 /// Copy the wallpapers shipped inside the app into ~/Wallpaper on first run and after updates.
@@ -83,7 +111,8 @@ func installBundledWallpapers() {
     }
     // Remove wallpapers that earlier builds shipped and this one no longer does. Builds from before
     // this list was kept are covered by naming their retired files.
-    let earlier = Set(defaults.stringArray(forKey: "bundledFiles") ?? []).union(["live/vigil.html", "live/vigil.js"])
+    let earlier = Set(defaults.stringArray(forKey: "bundledFiles") ?? []).union(
+        ["live/vigil.html", "live/vigil.js"] + ["aurora", "bauhaus", "dunes", "silk", "topography"].map { "images/\($0).jpg" })
     for rel in earlier.subtracting(shipped) {
         try? fm.removeItem(at: wallpaperDir.appendingPathComponent(rel))
     }
@@ -96,6 +125,9 @@ func installBundledWallpapers() {
       · web wallpapers: .html (may load .js files and images next to them)
       · videos: .mp4 .mov .m4v (muted, looping)
       · images: .jpg .png .heic .gif .webp
+
+    The menu files wallpapers by the folder they are in: put a file in a folder called City
+    and it shows up under City. Files at the top of this folder go under Other.
 
     The lib folder holds scripts shared by the bundled live wallpapers; please keep it.
     App updates refresh the bundled wallpapers; files you add yourself are never touched.
@@ -441,21 +473,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         listed = scanWallpapers()
-        var lastKind: Kind?
+        // One submenu per category; the category holding the current wallpaper is ticked too
+        var group: NSMenu?
         for (i, w) in listed.enumerated() {
-            if w.kind != lastKind {
-                if lastKind != nil { menu.addItem(.separator()) }
-                let header = NSMenuItem(title: ["Live", "Videos", "Images"][w.kind.rawValue], action: nil, keyEquivalent: "")
-                header.isEnabled = false
-                menu.addItem(header)
-                lastKind = w.kind
+            if i == 0 || listed[i - 1].category != w.category {
+                let parent = NSMenuItem(title: w.category, action: nil, keyEquivalent: "")
+                group = NSMenu(title: w.category)
+                parent.submenu = group
+                menu.addItem(parent)
             }
             let item = NSMenuItem(title: w.title, action: #selector(pick(_:)), keyEquivalent: "")
             item.target = self
             item.tag = i
-            item.indentationLevel = 1
             item.state = w.path == currentPath ? .on : .off
-            menu.addItem(item)
+            group?.addItem(item)
+            if w.path == currentPath { menu.items.last?.state = .on }
         }
         if listed.isEmpty {
             let empty = NSMenuItem(title: "No wallpapers in the folder yet", action: nil, keyEquivalent: "")

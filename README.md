@@ -1,34 +1,44 @@
 # wallpaper
 
-Generated wallpapers: **live wallpapers** (ASCII art and cross-stitch, as web pages and videos) and a **static 4K** set.
+Generated wallpapers: **live wallpapers** (ASCII art, cross-stitch and type, as web pages and videos) and a **static 4K** set, grouped by theme: deep sea, sea, nature, abstract.
 
 Open `index.html` in the repository root for a gallery of everything.
 
 ## Live wallpapers `live/`
 
-### ASCII
+Grouped by theme, the same way the Mac app's menu groups them. Each page names its category in a `<meta name="category">` tag.
 
-| Wallpaper | What it is | Options |
-| --- | --- | --- |
-| **Shoal** `live/shoal.html` | Koi built from glyph tiles swimming over a grid: scales, dorsal line, gills, finned tail and pectoral fins, side lighting and shadows, barbels, ripples. Fish flee from the pointer. | `?theme=light` grey on paper · `?fish=8` number of fish |
-| **Isle** `live/isle.html` | A floating block island: a cabin with a smoking chimney, falling leaves, a pond, a waterfall, clouds, sun and moon. Runs a full day/night cycle; at night lanterns, the window and glowstone light up the blocks around them, and fireflies come out. The terrain is different on every load. | `?time=day/sunset/night` fixed time · `?day=60` seconds per day · `?seed=7` fixed terrain · `?res=200` finer glyphs · `?ascii=0` plain block version |
-| **Abyss** `live/abyss.html` | The deep sea, beyond the reach of sunlight. A single glowing jellyfish drifts through the dark, its tentacles trailing the path it swam. Marine snow shows only where its light falls, and now and then something flickers far away. Moving the pointer stirs faint bioluminescence. | `?res=200` finer glyphs · `?ascii=0` plain version |
-| **Tide** `live/tide.html` | A beach seen from straight above on a bright day, set entirely in type: the sand is dots and commas, the water tildes, the foam bubbles (`o O @`) and the sun's glitter stars. Swells break over a sandbar into lines of foam, run up the sand and slide back, leaving it dark and glossy for a moment. The water goes from clear turquoise over the sand to deep blue, light ripples across the bottom, and someone's footprints wander along the beach. Moving the pointer over the water stirs rings. Drawn on the GPU (WebGL). | `?res=90` larger type · `?ascii=0` plain picture |
-| **Kanagawa** `live/kanagawa.html` | After Hokusai's *The Great Wave off Kanagawa* (c. 1831), set in type on cream paper: the wave's lines come out as runs of `/ \ \| -`, its body as dense type in Prussian blue. The crest breaks into claws of foam that throw spray across the sky like snow; under the curl, far off, stands Mount Fuji. Boats ride the swell and a small wave in front echoes the mountain. The wave breathes, its claws flicker, the boats rise and fall. | `?res=90` larger type · `?ascii=0` plain picture |
+### Deep sea
 
-![Shoal](output/previews/shoal.jpg)
-![Isle at sunset](output/previews/isle-sunset.jpg)
+| Wallpaper | Style | What it is | Options |
+| --- | --- | --- | --- |
+| **Abyss** `live/abyss.html` | ASCII | The deep sea, beyond the reach of sunlight. A single glowing jellyfish drifts through the dark, its tentacles trailing the path it swam. Marine snow shows only where its light falls, and now and then something flickers far away. Moving the pointer stirs faint bioluminescence. | `?res=200` finer glyphs · `?ascii=0` plain version |
+| **Leviathan** `live/leviathan.html` | ASCII | A blue whale passing through the deep. The dark is complete; now and then a whale comes through it, drawn in the light of the plankton flaring where water slides along its skin: the long pointed head, the flipper, the slender back with its small fin set far behind, and the flukes, whose slow strokes shed swirls of light into a wake that hangs in the water after it has gone. That light falls faintly on the body itself: the line of the mouth, the eye, the long grooves of the throat, the mottled flank. The swimming follows how whales move: a wave runs back along the body, the flukes trail the tail stock, the head nods against each stroke, the body heaves and surges, the path wanders. On a phone it dives or rises through the picture. Moving the pointer stirs the plankton. | `?res=200` finer glyphs · `?ascii=0` plain version |
+
 ![Abyss](output/previews/abyss-desktop.jpg)
+![Leviathan](output/previews/leviathan-desktop.jpg)
+
+### Sea
+
+| Wallpaper | Style | What it is | Options |
+| --- | --- | --- | --- |
+| **Tide** `live/tide.html` | ASCII | A beach seen from straight above on a bright day, set entirely in type: the sand is dots and commas, the water tildes, the foam bubbles (`o O @`) and the sun's glitter stars. Swells break over a sandbar into lines of foam, run up the sand and slide back, leaving it dark and glossy for a moment. The water goes from clear turquoise over the sand to deep blue, light ripples across the bottom, and someone's footprints wander along the beach. Moving the pointer over the water stirs rings. Drawn on the GPU (WebGL). | `?res=90` larger type · `?ascii=0` plain picture |
+| **Kanagawa** `live/kanagawa.html` | Type on paper | After Hokusai's *The Great Wave off Kanagawa* (c. 1831), set in type on cream paper: the wave's lines come out as runs of `/ \ \| -`, its body as dense type in Prussian blue. The crest breaks into claws of foam that throw spray across the sky like snow; under the curl, far off, stands Mount Fuji. Boats ride the swell and a small wave in front echoes the mountain. The wave breathes, its claws flicker, the boats rise and fall. | `?res=90` larger type · `?ascii=0` plain picture |
+
 ![Tide](output/previews/tide-desktop.jpg)
 ![Kanagawa](output/previews/kanagawa-desktop.jpg)
 
-### Cross-stitch
+### Nature
 
-| Wallpaper | What it is | Options |
-| --- | --- | --- |
-| **Vista** `live/vista.html` | A mountain valley at blue hour: the Milky Way, peaks holding the last pink light, a mirror lake, a lakeside village with lit windows, a waterfall, mist along the mountains, shooting stars, birds, and a lantern boat crossing the water. | `?res=200` finer stitches |
-| **Bloom** `live/bloom.html` | A lit window at night, wrapped in white blossoms. The vines sway, petals fall, the lamp flickers and a moth circles the light. Moving the pointer is like a gust of wind. The vines grow differently on every load. | `?res=200` finer stitches |
+| Wallpaper | Style | What it is | Options |
+| --- | --- | --- | --- |
+| **Shoal** `live/shoal.html` | ASCII | Koi built from glyph tiles swimming over a grid: scales, dorsal line, gills, finned tail and pectoral fins, side lighting and shadows, barbels, ripples. Fish flee from the pointer. | `?theme=light` grey on paper · `?fish=8` number of fish |
+| **Isle** `live/isle.html` | ASCII | A floating block island: a cabin with a smoking chimney, falling leaves, a pond, a waterfall, clouds, sun and moon. Runs a full day/night cycle; at night lanterns, the window and glowstone light up the blocks around them, and fireflies come out. The terrain is different on every load. | `?time=day/sunset/night` fixed time · `?day=60` seconds per day · `?seed=7` fixed terrain · `?res=200` finer glyphs · `?ascii=0` plain block version |
+| **Vista** `live/vista.html` | Cross-stitch | A mountain valley at blue hour: the Milky Way, peaks holding the last pink light, a mirror lake, a lakeside village with lit windows, a waterfall, mist along the mountains, shooting stars, birds, and a lantern boat crossing the water. | `?res=200` finer stitches |
+| **Bloom** `live/bloom.html` | Cross-stitch | A lit window at night, wrapped in white blossoms. The vines sway, petals fall, the lamp flickers and a moth circles the light. Moving the pointer is like a gust of wind. The vines grow differently on every load. | `?res=200` finer stitches |
 
+![Shoal](output/previews/shoal.jpg)
+![Isle at sunset](output/previews/isle-sunset.jpg)
 ![Vista](output/previews/vista-desktop.jpg)
 ![Bloom](output/previews/bloom-desktop.jpg)
 
@@ -58,11 +68,11 @@ To install by hand instead, download `Wallpaper.zip` from [Releases](https://git
 
 Once installed, a ✦ icon appears in the menu bar. Click it to pick a wallpaper.
 
-**Menu**: wallpapers · Shuffle · Pause/Resume · Open Wallpaper Folder · Reload · Check for Updates · Automatic Updates (on by default) · Launch at Login (on by default) · Quit
+**Menu**: wallpapers, one submenu per category (Deep Sea, Sea, Nature, Abstract, …) · Shuffle · Pause/Resume · Open Wallpaper Folder · Reload · Check for Updates · Automatic Updates (on by default) · Launch at Login (on by default) · Quit
 
 **Updates**: the app checks when it starts and then every 6 hours. When a new build is out it downloads it in the background, swaps itself in place and relaunches. New wallpapers arrive with app updates.
 
-**Adding wallpapers**: everything lives in `~/Wallpaper` (menu → Open Wallpaper Folder). Drop files in and they show up the next time you open the menu:
+**Adding wallpapers**: everything lives in `~/Wallpaper` (menu → Open Wallpaper Folder). Drop files in and they show up the next time you open the menu, filed under the name of the folder they are in: put a video in `~/Wallpaper/City/` and it appears under City. Files at the top of the folder go under Other, and a web page can name its own category with `<meta name="category" content="City">`. Supported:
 
 - web wallpapers: `.html` (may load scripts and images next to them)
 - videos: `.mp4` `.mov` `.m4v` (muted, looping)
@@ -73,7 +83,7 @@ Notes:
 - Every display shows the wallpaper. Pointer movement is forwarded to web wallpapers, so the koi still flee from the mouse.
 - Playback pauses while the screens sleep or the session is locked.
 - The bundled wallpapers are copied into `~/Wallpaper` on first launch and refreshed on every update. Files you add yourself are never touched.
-- The images bundled with the app are the ASCII versions of the static set.
+- The images bundled with the app are the ASCII versions of the static set, filed under Nature and Abstract.
 - Requires macOS 12 or later, on Intel or Apple silicon.
 - The source is in `mac/`. Pushing changes to `mac/`, `live/` or `lib/` makes GitHub Actions rebuild the app on a macOS runner and refresh the `mac-latest` release, and installed copies update to it.
 
@@ -98,7 +108,7 @@ Notes:
 
 ## Static wallpapers `static/`
 
-Dunes, Bauhaus, Silk, Topography and Aurora: `output/static/*-desktop.jpg` (3840×2160) and `*-phone.jpg` (1290×2796).
+Dunes and Aurora (nature), Bauhaus, Silk and Topography (abstract): `output/static/*-desktop.jpg` (3840×2160) and `*-phone.jpg` (1290×2796).
 
 ASCII versions of the same five are in `output/static/ascii/` (`node render-static.js --ascii`).
 
