@@ -49,7 +49,12 @@
    - 也可以在终端运行一次：`xattr -dr com.apple.quarantine /Applications/LiveWall.app`
 4. 菜单栏会出现一个 ✦ 图标，点开就能选壁纸。
 
-**菜单**：选择壁纸 · 随机换一张 · 暂停/继续 · 打开壁纸文件夹 · 重新载入 · 开机自动启动（默认开） · 退出
+**菜单**：选择壁纸 · 随机换一张 · 暂停/继续 · 打开壁纸文件夹 · 重新载入 · 检查更新 · 自动更新（默认开） · 开机自动启动（默认开） · 退出
+
+**自动更新**：App 启动后检查一次，之后每 6 小时检查一次。有新版本就在后台下载、替换并重启，新壁纸也会随更新一起出现。因为仓库是私有的，App 需要权限才能下载更新，下面两种方式任选一种：
+
+- 把仓库改成公开（GitHub 仓库 → Settings → General → 最下面 Danger Zone → Change visibility），App 不用任何设置。
+- 保持私有：在 GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens 新建一个令牌，Repository access 只选 `t1anhe/wallpaper`，Permissions 只给 **Contents: Read-only**。然后在 LiveWall 菜单里点「设置 GitHub 访问令牌…」粘贴进去。令牌只保存在本机（`~/Library/Application Support/LiveWall/github-token`，只有你的账户能读）。
 
 **添加壁纸**：所有壁纸都在 `~/LiveWall` 文件夹（菜单里「打开壁纸文件夹」）。往里面放文件就行，下次点开菜单就会出现：
 
