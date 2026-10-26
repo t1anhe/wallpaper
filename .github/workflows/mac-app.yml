@@ -16,6 +16,11 @@ on:
 permissions:
   contents: write
 
+# A newer push supersedes an in-flight build
+concurrency:
+  group: mac-app
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-14
