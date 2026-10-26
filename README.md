@@ -13,10 +13,12 @@ Open `index.html` in the repository root for a gallery of everything.
 | **Shoal** `live/shoal.html` | Koi built from glyph tiles swimming over a grid: scales, dorsal line, gills, finned tail and pectoral fins, side lighting and shadows, barbels, ripples. Fish flee from the pointer. | `?theme=light` grey on paper · `?fish=8` number of fish |
 | **Isle** `live/isle.html` | A floating block island: a cabin with a smoking chimney, falling leaves, a pond, a waterfall, clouds, sun and moon. Runs a full day/night cycle; at night lanterns, the window and glowstone light up the blocks around them, and fireflies come out. The terrain is different on every load. | `?time=day/sunset/night` fixed time · `?day=60` seconds per day · `?seed=7` fixed terrain · `?res=200` finer glyphs · `?ascii=0` plain block version |
 | **Abyss** `live/abyss.html` | The deep sea, beyond the reach of sunlight. A single glowing jellyfish drifts through the dark, its tentacles trailing the path it swam. Marine snow shows only where its light falls, and now and then something flickers far away. Moving the pointer stirs faint bioluminescence. | `?res=200` finer glyphs · `?ascii=0` plain version |
+| **Vigil** `live/vigil.html` | Night over an empty field. A half-built tower stands at its edge with a tower crane beside it, and the red warning lights on the roof and the crane blink slowly, all night. Wind moves through the grass and the safety netting, a town glows faintly on the horizon, and once in a while a car's lights slide past. | `?res=200` finer glyphs · `?ascii=0` plain version |
 
 ![Shoal](output/previews/shoal.jpg)
 ![Isle at sunset](output/previews/isle-sunset.jpg)
 ![Abyss](output/previews/abyss-desktop.jpg)
+![Vigil](output/previews/vigil-desktop.jpg)
 
 ### Cross-stitch
 
