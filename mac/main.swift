@@ -1,6 +1,6 @@
-// LiveWall — a menu bar app that puts live wallpapers behind the desktop icons.
+// Wallpaper — a menu bar app that puts live wallpapers behind the desktop icons.
 //
-// Wallpapers live in ~/LiveWall. Anything dropped in there (or a subfolder) shows up in the menu
+// Wallpapers live in ~/Wallpaper. Anything dropped in there (or a subfolder) shows up in the menu
 // the next time it is opened: web pages (.html), videos (.mp4/.mov/.m4v) and images.
 // The wallpapers bundled with the app are copied in on first launch and refreshed on updates;
 // files the user adds are never touched.
@@ -10,7 +10,9 @@ import Cocoa
 import ServiceManagement
 import WebKit
 
-let wallpaperDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("LiveWall", isDirectory: true)
+let wallpaperDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Wallpaper", isDirectory: true)
+/// Where the app kept its wallpapers when it was called LiveWall; moved over on first launch.
+let legacyDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("LiveWall", isDirectory: true)
 let defaults = UserDefaults.standard
 
 // MARK: - Wallpaper files
@@ -54,11 +56,14 @@ func scanWallpapers() -> [Wallpaper] {
         .sorted { ($0.kind.rawValue, $0.title.lowercased()) < ($1.kind.rawValue, $1.title.lowercased()) }
 }
 
-/// Copy the wallpapers shipped inside the app into ~/LiveWall on first run and after updates.
+/// Copy the wallpapers shipped inside the app into ~/Wallpaper on first run and after updates.
 func installBundledWallpapers() {
     let fm = FileManager.default
     guard let src = Bundle.main.resourceURL?.appendingPathComponent("Wallpapers") else { return }
     let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+    if !fm.fileExists(atPath: wallpaperDir.path) && fm.fileExists(atPath: legacyDir.path) {
+        try? fm.moveItem(at: legacyDir, to: wallpaperDir)
+    }
     let firstRun = !fm.fileExists(atPath: wallpaperDir.path)
     try? fm.createDirectory(at: wallpaperDir, withIntermediateDirectories: true)
     guard firstRun || defaults.string(forKey: "installedVersion") != version else { return }
@@ -75,9 +80,9 @@ func installBundledWallpapers() {
         }
     }
     let readme = """
-    LiveWall 壁纸文件夹
+    Wallpaper 壁纸文件夹
 
-    把壁纸文件放进这个文件夹（或任意子文件夹），点开菜单栏的 LiveWall 图标就能看到并切换：
+    把壁纸文件放进这个文件夹（或任意子文件夹），点开菜单栏的 Wallpaper 图标就能看到并切换：
       · 网页动态壁纸：.html（可以引用同文件夹里的 .js / 图片等文件）
       · 视频：.mp4 .mov .m4v（静音循环播放）
       · 图片：.jpg .png .heic .gif .webp
@@ -92,7 +97,7 @@ func installBundledWallpapers() {
 // MARK: - Launch at login
 
 enum LoginItem {
-    static let label = "com.t1anhe.livewall"
+    static let label = "com.t1anhe.wallpaper"
     static var agentURL: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents/\(label).plist")
     }
@@ -107,7 +112,7 @@ enum LoginItem {
             do {
                 if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             } catch {
-                NSLog("LiveWall: login item change failed: \(error)")
+                NSLog("Wallpaper: login item change failed: \(error)")
             }
             return
         }
@@ -125,40 +130,6 @@ enum LoginItem {
 
 let releaseAPI = "https://api.github.com/repos/t1anhe/wallpaper/releases/tags/mac-latest"
 let currentBuild = Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
-
-/// Optional GitHub token, only needed while the repository is private. Kept in a file readable by
-/// this user only (the Keychain would re-prompt after every update, since each build is ad-hoc signed).
-enum TokenStore {
-    static var url: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/LiveWall/github-token")
-    }
-
-    static var token: String? {
-        get {
-            let t = (try? String(contentsOf: url, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return t?.isEmpty == false ? t : nil
-        }
-        set {
-            let fm = FileManager.default
-            guard let t = newValue?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else {
-                try? fm.removeItem(at: url)
-                return
-            }
-            try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            fm.createFile(atPath: url.path, contents: Data(t.utf8), attributes: [.posixPermissions: 0o600])
-        }
-    }
-}
-
-/// Release downloads redirect to a storage host that rejects the GitHub token, so drop it on redirect.
-final class RedirectGuard: NSObject, URLSessionTaskDelegate {
-    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        var r = request
-        if r.url?.host != task.originalRequest?.url?.host { r.setValue(nil, forHTTPHeaderField: "Authorization") }
-        completionHandler(r)
-    }
-}
 
 // MARK: - One wallpaper on one screen
 
@@ -269,7 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var updateStatus = "版本 build \(currentBuild)"
     private var updating = false
     private var updateTimer: Timer?
-    private let session = URLSession(configuration: .ephemeral, delegate: RedirectGuard(), delegateQueue: nil)
+    private let session = URLSession(configuration: .ephemeral)
 
     private var currentPath: String? {
         get { defaults.string(forKey: "current") }
@@ -279,7 +250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Bundle.main.bundlePath.contains("/AppTranslocation/") {
             let alert = NSAlert()
-            alert.messageText = "请先把 LiveWall 拖进「应用程序」文件夹"
+            alert.messageText = "请先把 Wallpaper 拖进「应用程序」文件夹"
             alert.informativeText = "从「下载」文件夹直接打开时，开机启动等功能无法正常工作。移动后再从「应用程序」里打开即可。"
             alert.runModal()
         }
@@ -294,7 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "LiveWall")
+            button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Wallpaper")
             button.image?.isTemplate = true
         }
         let menu = NSMenu()
@@ -335,7 +306,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func githubRequest(_ url: String, accept: String) -> URLRequest {
         var req = URLRequest(url: URL(string: url)!)
         req.setValue(accept, forHTTPHeaderField: "Accept")
-        if let token = TokenStore.token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         return req
     }
 
@@ -350,18 +320,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func handleRelease(_ json: [String: Any]?, status: Int, manual: Bool) {
         guard status == 200, let json = json else {
-            updateStatus = status == 404 || status == 401 || status == 403
-                ? "无法访问更新：仓库是私有的，需要设置 GitHub 访问令牌"
-                : "检查更新失败（网络不通？）"
+            updateStatus = "检查更新失败（网络不通？）"
             if manual { tell(updateStatus) }
             return
         }
-        // Release title looks like "LiveWall for Mac (build 12)"
+        // Release title looks like "Wallpaper for Mac (build 12)"
         let name = json["name"] as? String ?? ""
         let build = Int(name.components(separatedBy: "build ").last?.filter { $0.isNumber } ?? "") ?? 0
         let assets = json["assets"] as? [[String: Any]] ?? []
         guard build > currentBuild,
-              let asset = assets.first(where: { $0["name"] as? String == "LiveWall.zip" }),
+              let asset = assets.first(where: { ($0["name"] as? String)?.hasSuffix(".zip") == true }),
               let assetURL = asset["url"] as? String
         else {
             updateStatus = "已是最新版本（build \(currentBuild)）"
@@ -376,11 +344,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateStatus = "正在下载 build \(build)…"
         session.downloadTask(with: githubRequest(assetURL, accept: "application/octet-stream")) { tmp, resp, _ in
             let fm = FileManager.default
-            let work = fm.temporaryDirectory.appendingPathComponent("LiveWallUpdate-\(UUID().uuidString)")
+            let work = fm.temporaryDirectory.appendingPathComponent("WallpaperUpdate-\(UUID().uuidString)")
             var zip: URL?
             if let tmp = tmp, (resp as? HTTPURLResponse)?.statusCode == 200 {
                 try? fm.createDirectory(at: work, withIntermediateDirectories: true)
-                let dst = work.appendingPathComponent("LiveWall.zip")
+                let dst = work.appendingPathComponent("update.zip")
                 if (try? fm.moveItem(at: tmp, to: dst)) != nil { zip = dst }
             }
             DispatchQueue.main.async { self.install(zip: zip, work: work, build: build, manual: manual) }
@@ -405,18 +373,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             unzip.waitUntilExit()
             unpacked = unzip.terminationStatus == 0
         } catch {}
-        let fresh = work.appendingPathComponent("LiveWall.app")
+        let fresh = (try? fm.contentsOfDirectory(at: work, includingPropertiesForKeys: nil))?.first { $0.pathExtension == "app" }
         let current = Bundle.main.bundleURL
         let old = work.appendingPathComponent("previous.app")
-        guard unpacked, fm.fileExists(atPath: fresh.path) else {
+        guard unpacked, let fresh = fresh else {
             updateStatus = "更新包解压失败"
             if manual { tell(updateStatus) }
             return
         }
+        let target = current.deletingLastPathComponent().appendingPathComponent(fresh.lastPathComponent)
         do {
             try fm.moveItem(at: current, to: old)
             do {
-                try fm.moveItem(at: fresh, to: current)
+                try fm.moveItem(at: fresh, to: target)
             } catch {
                 try? fm.moveItem(at: old, to: current)
                 throw error
@@ -428,7 +397,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let relaunch = Process()
         relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
-        relaunch.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", current.path]
+        relaunch.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", target.path]
         try? relaunch.run()
         NSApp.terminate(nil)
     }
@@ -436,7 +405,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func tell(_ message: String) {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "LiveWall"
+        alert.messageText = "Wallpaper"
         alert.informativeText = message
         alert.runModal()
     }
@@ -494,11 +463,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(status)
         add(to: menu, "检查更新", #selector(checkNow))
         add(to: menu, "自动更新", #selector(toggleAutoUpdate)).state = defaults.bool(forKey: "autoUpdate") ? .on : .off
-        add(to: menu, TokenStore.token == nil ? "设置 GitHub 访问令牌…" : "更换 GitHub 访问令牌…", #selector(setToken))
         menu.addItem(.separator())
         add(to: menu, "开机自动启动", #selector(toggleLogin)).state = LoginItem.isEnabled ? .on : .off
         menu.addItem(.separator())
-        add(to: menu, "退出 LiveWall", #selector(quit), key: "q")
+        add(to: menu, "退出 Wallpaper", #selector(quit), key: "q")
     }
 
     @discardableResult
@@ -548,22 +516,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleAutoUpdate() {
         defaults.set(!defaults.bool(forKey: "autoUpdate"), forKey: "autoUpdate")
-    }
-
-    @objc private func setToken() {
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = "GitHub 访问令牌"
-        alert.informativeText = "仓库是私有的时候，自动更新需要一个只读令牌。在 GitHub → Settings → Developer settings → Fine-grained tokens 创建，只勾选 t1anhe/wallpaper 仓库的 Contents: Read-only 权限。留空并保存可以删除令牌。"
-        let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        field.placeholderString = "github_pat_…"
-        alert.accessoryView = field
-        alert.addButton(withTitle: "保存")
-        alert.addButton(withTitle: "取消")
-        alert.window.initialFirstResponder = field
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        TokenStore.token = field.stringValue
-        checkForUpdate(manual: true)
     }
 
     @objc private func quit() {

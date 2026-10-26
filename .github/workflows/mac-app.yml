@@ -1,7 +1,7 @@
 name: Mac app
 
-# Builds LiveWall.app on a macOS runner and publishes it as the "mac-latest" release.
-# Only runs when the app or the bundled wallpapers change (macOS minutes are expensive on private repos).
+# Builds Wallpaper.app on a macOS runner and publishes it as the "mac-latest" release.
+# Only runs when the app or the bundled wallpapers change.
 on:
   push:
     branches: [claude/affectionate-hamilton-in1kmo]
@@ -27,20 +27,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build LiveWall.app
+      - name: Build Wallpaper.app
         run: VERSION=${{ github.run_number }} bash mac/build.sh
 
       - uses: actions/upload-artifact@v4
         with:
-          name: LiveWall
-          path: build/LiveWall.zip
+          name: Wallpaper
+          path: build/Wallpaper.zip
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete mac-latest --yes --cleanup-tag || true
-          gh release create mac-latest build/LiveWall.zip \
+          gh release create mac-latest build/Wallpaper.zip \
             --target "${{ github.sha }}" \
-            --title "LiveWall for Mac (build ${{ github.run_number }})" \
-            --notes "下载 LiveWall.zip，解压后把 LiveWall 拖进「应用程序」文件夹。第一次打开如果提示无法验证开发者：系统设置 → 隐私与安全性 → 找到 LiveWall →「仍要打开」。之后就会出现在菜单栏，并开机自动启动。壁纸文件夹：~/LiveWall"
+            --title "Wallpaper for Mac (build ${{ github.run_number }})" \
+            --notes "一键安装：在「终端」里运行 curl -fsSL https://raw.githubusercontent.com/t1anhe/wallpaper/claude/affectionate-hamilton-in1kmo/mac/install.sh | bash 。也可以下载 Wallpaper.zip 手动安装（第一次打开需要在 系统设置 → 隐私与安全性 里点「仍要打开」）。装好后会自动更新。壁纸文件夹：~/Wallpaper"

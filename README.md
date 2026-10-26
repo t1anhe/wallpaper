@@ -37,26 +37,27 @@
 
 录好的视频在 `output/live/*.mp4`（电脑 1920×1080，手机 1080×2340）。
 
-## Mac 应用 LiveWall（推荐）
+## Mac 应用 Wallpaper（推荐）
 
-菜单栏小程序：把动态壁纸放到桌面图标下面，开机自动启动。
+菜单栏小程序：把动态壁纸放到桌面图标下面，开机自动启动，自动更新。
 
-**安装**
+**一键安装**：打开「终端」，粘贴下面这行，回车：
 
-1. 打开仓库的 [Releases](https://github.com/t1anhe/wallpaper/releases/tag/mac-latest) 页面，下载 `LiveWall.zip`，双击解压。
-2. 把 `LiveWall` 拖进「应用程序」文件夹，然后打开它。
-3. 第一次打开时，macOS 会提示"无法验证开发者"（这个 App 没有付费的苹果开发者签名）：打开 **系统设置 → 隐私与安全性**，往下找到 LiveWall，点 **「仍要打开」**。只需要这一次。
-   - 也可以在终端运行一次：`xattr -dr com.apple.quarantine /Applications/LiveWall.app`
-4. 菜单栏会出现一个 ✦ 图标，点开就能选壁纸。
+```bash
+curl -fsSL https://raw.githubusercontent.com/t1anhe/wallpaper/claude/affectionate-hamilton-in1kmo/mac/install.sh | bash
+```
+
+脚本会下载最新版，放进「应用程序」文件夹，然后打开。如果装过旧的 LiveWall，会被替换掉，`~/LiveWall` 里的文件也会搬到 `~/Wallpaper`。用这种方式安装，不会弹出"无法验证开发者"的提示。
+
+也可以手动安装：在 [Releases](https://github.com/t1anhe/wallpaper/releases/tag/mac-latest) 下载 `Wallpaper.zip`，解压后拖进「应用程序」。第一次打开要到 **系统设置 → 隐私与安全性** 里点 **「仍要打开」**。
+
+装好后，菜单栏会出现一个 ✦ 图标，点开就能选壁纸。
 
 **菜单**：选择壁纸 · 随机换一张 · 暂停/继续 · 打开壁纸文件夹 · 重新载入 · 检查更新 · 自动更新（默认开） · 开机自动启动（默认开） · 退出
 
-**自动更新**：App 启动后检查一次，之后每 6 小时检查一次。有新版本就在后台下载、替换并重启，新壁纸也会随更新一起出现。因为仓库是私有的，App 需要权限才能下载更新，下面两种方式任选一种：
+**自动更新**：启动时检查一次，之后每 6 小时检查一次。有新版本会在后台下载、替换并重启，新壁纸也会随更新一起出现。
 
-- 把仓库改成公开（GitHub 仓库 → Settings → General → 最下面 Danger Zone → Change visibility），App 不用任何设置。
-- 保持私有：在 GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens 新建一个令牌，Repository access 只选 `t1anhe/wallpaper`，Permissions 只给 **Contents: Read-only**。然后在 LiveWall 菜单里点「设置 GitHub 访问令牌…」粘贴进去。令牌只保存在本机（`~/Library/Application Support/LiveWall/github-token`，只有你的账户能读）。
-
-**添加壁纸**：所有壁纸都在 `~/LiveWall` 文件夹（菜单里「打开壁纸文件夹」）。往里面放文件就行，下次点开菜单就会出现：
+**添加壁纸**：所有壁纸都在 `~/Wallpaper` 文件夹，菜单里点「打开壁纸文件夹」就能打开。往里面放文件就行，下次点开菜单就会出现：
 
 - 网页动态壁纸 `.html`（可以引用同文件夹里的 js、图片）
 - 视频 `.mp4` `.mov` `.m4v`（静音循环）
@@ -64,11 +65,11 @@
 
 其他说明：
 
-- 多显示器会同时显示，鼠标移动会传给网页壁纸，比如鱼还是会被鼠标吓跑。
-- 屏幕休眠、锁屏时自动暂停。
-- 自带的壁纸在第一次启动和 App 更新时会装进或刷新到 `~/LiveWall`，你自己放进去的文件不会被改动。
+- 多显示器会同时显示；鼠标移动会传给网页壁纸，比如鱼还是会被鼠标吓跑。
+- 屏幕休眠或锁屏时会自动暂停。
+- 自带的壁纸在第一次启动和每次更新时会装进或刷新到 `~/Wallpaper`，你自己放进去的文件不会被改动。
 - 需要 macOS 12 或更新版本，Intel 和 Apple 芯片都能用。
-- 源码在 `mac/`。每次修改 `mac/`、`live/`、`lib/` 并推送后，GitHub Actions 会在 Mac 机器上重新编译，并更新 Releases 里的 `mac-latest`。
+- 源码在 `mac/`。修改 `mac/`、`live/` 或 `lib/` 并推送后，GitHub Actions 会在 Mac 机器上重新编译，并更新 Releases 里的 `mac-latest`；装好的 App 会自动更新过去。
 
 ## 其他方式：同步到电脑并设成壁纸
 
