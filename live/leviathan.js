@@ -2,21 +2,23 @@
 // The dark is complete. Now and then a whale comes through it, drawn in the light of the plankton
 // flaring where water slides along its skin: the long pointed head, the flipper, the slender back with
 // its small fin set far behind, and the flukes, whose slow strokes shed swirls of light into a wake
-// that hangs in the water after it has gone. That light falls faintly on the body itself, on the line
-// of the mouth, the eye, the long grooves of the throat and the mottled flank. Then the dark comes
-// back. On a phone the whale dives or rises through the picture instead of crossing it.
+// that hangs in the water after it has gone. The body itself stays dark; only the small glowing
+// creatures living on its skin hint at it, twinkling in lines along the mouth and the grooves of the
+// throat, in a ring round the eye, in clusters on the head and the flipper. Then the dark comes back. On a phone the whale dives or rises through the picture instead of crossing it.
 // Moving the pointer stirs the plankton.
 //
 // The swimming follows how whales move: the flukes beat up and down; a wave runs back along the body,
 // growing towards the tail; the flukes trail the tail stock's angle; the head nods against the stroke;
 // each stroke heaves the body and gives a little surge of speed; and the path wanders slowly.
 // Rendered as ASCII by default (?ascii=0 for the plain version, ?res=<glyph rows>).
-function createLeviathan({ w, h, rng }) {
+function createLeviathan({ w, h, rng, params }) {
   const { noise2 } = makeNoise(rng);
   const u = Math.min(w, h);
   const portrait = h > w;
   const TAU = Math.PI * 2;
   const lw = (k) => Math.max(1, u * k);
+  // In glyphs the scene is sampled about three pixels to a character: small lights must fill a cell
+  const glyphs = params.get('ascii') !== '0';
   let now = 0;
 
   // ---------- the whale, in body units: s from the tip of the snout (0) back to the fluke notch (1), y dorsal ----------
@@ -304,69 +306,57 @@ function createLeviathan({ w, h, rng }) {
     ctx.globalAlpha = 1;
   }
 
-  // Spots of paler skin on the flank, fixed for the life of the program (body units)
-  const MOTTLE = Array.from({ length: 160 }, () => ({ s: 0.1 + rng() * 0.78, f: rng() * 1.7 - 0.7, r: 0.0025 + rng() * 0.005 }));
-  // The body as the plankton's light shows it: a dim fill, darker below, the mottled flank, the line of
-  // the mouth sweeping up to the eye, and the long grooves of the throat running back to the navel
-  function drawBody(ctx, t) {
-    const line = (pts) => {
-      ctx.beginPath();
-      pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-      ctx.stroke();
-    };
-    const at = (s, y) => toWorld(s, bend(s, t) + y);
-    ctx.save();
-    bodyPath(ctx, t);
-    ctx.clip();
-    const top = edge(0.4, 1, t), bot = edge(0.4, -1, t);
-    const g = ctx.createLinearGradient(top[0], top[1], bot[0], bot[1]);
-    g.addColorStop(0, 'rgba(70,130,160,0.2)');
-    g.addColorStop(0.6, 'rgba(40,90,120,0.1)');
-    g.addColorStop(1, 'rgba(20,50,70,0.03)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(150,210,230,0.13)';
-    for (const m of MOTTLE) {
-      const [tp, bt] = profile(m.s);
-      const [x, y] = at(m.s, m.f > 0 ? m.f * tp * 0.8 : m.f * bt * 0.5);
-      ctx.beginPath();
-      ctx.ellipse(x, y, m.r * whale.L * 2.2, m.r * whale.L, Math.atan2(F.f[1], F.f[0]), 0, TAU);
-      ctx.fill();
+  // Small glowing creatures living on the skin, the only sign of the body in the dark. Each sits at a
+  // fixed place on the whale (body units) and twinkles slowly on its own.
+  const riders = [];
+  const rider = (place, a) => riders.push({ place, a, p: rng() * TAU, v: 0.4 + rng() * 0.9 });
+  // Along the mouth, from the tip of the snout back to below the eye
+  for (let i = 0; i < 26; i++) {
+    const s = 0.01 + (i / 25) * 0.2 + (rng() - 0.5) * 0.006;
+    if (rng() < 0.8) rider({ s, y: -0.004 - 0.016 * Math.sin((s / 0.214) * Math.PI * 0.85) }, 0.55 + rng() * 0.35);
+  }
+  // In the long grooves of the throat, sparse, fading towards the navel
+  for (let k = 0; k < 8; k++) {
+    const s0 = 0.04 + k * 0.012, s1 = 0.48 - k * 0.018, depth = 0.25 + k * 0.08;
+    for (let i = 0; i < 14; i++) {
+      const s = s0 + rng() * (s1 - s0);
+      if (rng() < 0.35 + 0.5 * (1 - (s - s0) / (s1 - s0))) rider({ s, groove: depth, s0 }, 0.3 + rng() * 0.35);
     }
-    ctx.restore();
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgb(110,215,240)';
-    // The mouth, from the tip back, curving down and up again to just below the eye
-    ctx.lineWidth = lw(0.003);
-    ctx.globalAlpha = 0.8;
-    const mouth = [];
-    for (let i = 0; i <= 20; i++) {
-      const s = 0.004 + (i / 20) * 0.21;
-      mouth.push(at(s, -0.004 - 0.016 * Math.sin((s / 0.214) * Math.PI * 0.85)));
+  }
+  // A ring round the eye
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * TAU;
+    rider({ s: 0.232 + Math.cos(a) * 0.006, y: -0.001 + Math.sin(a) * 0.0045 }, 0.7);
+  }
+  // Clusters on the head (behind the blowhole, along the rostrum) and scattered over the back
+  for (const [cs, cy, n] of [[0.07, 0.6, 7], [0.13, 0.8, 9], [0.2, 0.85, 6], [0.42, 0.5, 5], [0.58, 0.3, 4]]) {
+    for (let i = 0; i < n; i++) rider({ s: cs + (rng() - 0.5) * 0.03, f: cy + (rng() - 0.5) * 0.3 }, 0.35 + rng() * 0.4);
+  }
+  for (let i = 0; i < 22; i++) rider({ s: 0.25 + rng() * 0.6, f: rng() * 1.6 - 0.6 }, 0.15 + rng() * 0.25);
+  // Along the leading edge of the flipper and on its tip
+  for (let i = 0; i < 12; i++) rider({ flip: [0.01 + rng() * 0.115, -0.012 + rng() * 0.008] }, 0.4 + rng() * 0.4);
+
+  function riderAt(r, t) {
+    const q = r.place;
+    if (q.flip) return flipper(t)(q.flip[0], q.flip[1]);
+    let y;
+    if (q.groove !== undefined) y = -profile(q.s)[1] * (1 - q.groove * Math.sin(Math.min(1, (q.s - q.s0) / 0.06) * Math.PI / 2));
+    else if (q.f !== undefined) y = q.f > 0 ? q.f * profile(q.s)[0] : q.f * profile(q.s)[1];
+    else y = q.y;
+    return toWorld(q.s, bend(q.s, t) + y);
+  }
+  function drawRiders(ctx, t) {
+    const dot = glyphs ? 2.6 : lw(0.0022), hs = glyphs ? 0.8 : 0.6;
+    for (const r of riders) {
+      const a = Math.min(1, r.a * (glyphs ? 1.35 : 1)) * (0.45 + 0.55 * Math.max(0, Math.sin(t * r.v + r.p)));
+      if (a < 0.04) continue;
+      const [x, y] = riderAt(r, t);
+      ctx.globalAlpha = a * 0.8;
+      ctx.drawImage(halo, x - HR * hs, y - HR * hs, HR * 2 * hs, HR * 2 * hs);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgb(190,250,240)';
+      ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot);
     }
-    line(mouth);
-    // The eye
-    const eye = at(0.232, -0.001);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgb(170,235,250)';
-    ctx.beginPath();
-    ctx.ellipse(eye[0], eye[1], whale.L * 0.0055, whale.L * 0.0035, Math.atan2(F.f[1], F.f[0]), 0, TAU);
-    ctx.fill();
-    // Throat grooves: long lines from the chin to the navel, following the curve of the belly
-    ctx.lineWidth = lw(0.0022);
-    for (let k = 0; k < 9; k++) {
-      const s0 = 0.035 + k * 0.012, s1 = 0.5 - k * 0.018, depth = 0.25 + k * 0.075;
-      const pts = [];
-      for (let i = 0; i <= 24; i++) {
-        const s = s0 + (i / 24) * (s1 - s0);
-        pts.push(at(s, -profile(s)[1] * (1 - depth * Math.sin(Math.min(1, (s - s0) / 0.06) * Math.PI / 2))));
-      }
-      ctx.globalAlpha = 0.45 * (1 - k * 0.05);
-      line(pts);
-    }
-    // The blowhole's splash guard
-    ctx.globalAlpha = 0.6;
-    line([at(0.17, profile(0.17)[0] - 0.004), at(0.19, profile(0.19)[0] + 0.002), at(0.205, profile(0.205)[0] - 0.003)]);
     ctx.globalAlpha = 1;
   }
 
@@ -390,9 +380,9 @@ function createLeviathan({ w, h, rng }) {
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
     }
-    if (whale) drawBody(ctx, now);
     ctx.globalCompositeOperation = 'lighter';
     if (whale) drawSheath(ctx, now);
+    if (whale) drawRiders(ctx, now);
     const dot = lw(0.0032);
     for (const p of lights) {
       const a = env(p);
