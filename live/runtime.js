@@ -76,7 +76,8 @@ const Live = {
     }
     let last = performance.now();
     function loop(now) {
-      advance((now - last) / 1000);
+      // Hosts (e.g. the Mac app) can freeze the scene by setting window.LIVE_PAUSED
+      if (!window.LIVE_PAUSED) advance((now - last) / 1000);
       last = now;
       requestAnimationFrame(loop);
     }

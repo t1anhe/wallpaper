@@ -1,0 +1,41 @@
+name: Mac app
+
+# Builds LiveWall.app on a macOS runner and publishes it as the "mac-latest" release.
+# Only runs when the app or the bundled wallpapers change (macOS minutes are expensive on private repos).
+on:
+  push:
+    branches: [claude/affectionate-hamilton-in1kmo]
+    paths:
+      - mac/**
+      - live/**
+      - lib/**
+      - output/static/**
+      - .github/workflows/mac-app.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build LiveWall.app
+        run: VERSION=${{ github.run_number }} bash mac/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiveWall
+          path: build/LiveWall.zip
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete mac-latest --yes --cleanup-tag || true
+          gh release create mac-latest build/LiveWall.zip \
+            --target "${{ github.sha }}" \
+            --title "LiveWall for Mac (build ${{ github.run_number }})" \
+            --notes "下载 LiveWall.zip，解压后把 LiveWall 拖进「应用程序」文件夹。第一次打开如果提示无法验证开发者：系统设置 → 隐私与安全性 → 找到 LiveWall →「仍要打开」。之后就会出现在菜单栏，并开机自动启动。壁纸文件夹：~/LiveWall"
