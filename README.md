@@ -13,10 +13,12 @@ Open `index.html` in the repository root for a gallery of everything.
 | **Shoal** `live/shoal.html` | Koi built from glyph tiles swimming over a grid: scales, dorsal line, gills, finned tail and pectoral fins, side lighting and shadows, barbels, ripples. Fish flee from the pointer. | `?theme=light` grey on paper · `?fish=8` number of fish |
 | **Isle** `live/isle.html` | A floating block island: a cabin with a smoking chimney, falling leaves, a pond, a waterfall, clouds, sun and moon. Runs a full day/night cycle; at night lanterns, the window and glowstone light up the blocks around them, and fireflies come out. The terrain is different on every load. | `?time=day/sunset/night` fixed time · `?day=60` seconds per day · `?seed=7` fixed terrain · `?res=200` finer glyphs · `?ascii=0` plain block version |
 | **Abyss** `live/abyss.html` | The deep sea, beyond the reach of sunlight. A single glowing jellyfish drifts through the dark, its tentacles trailing the path it swam. Marine snow shows only where its light falls, and now and then something flickers far away. Moving the pointer stirs faint bioluminescence. | `?res=200` finer glyphs · `?ascii=0` plain version |
+| **Tide** `live/tide.html` | A beach seen from straight above on a bright day, set entirely in type: the sand is dots and commas, the water tildes, the foam bubbles (`o O @`) and the sun's glitter stars. Swells break over a sandbar into lines of foam, run up the sand and slide back, leaving it dark and glossy for a moment. The water goes from clear turquoise over the sand to deep blue, light ripples across the bottom, and someone's footprints wander along the beach. Moving the pointer over the water stirs rings. Drawn on the GPU (WebGL). | `?res=90` larger type · `?ascii=0` plain picture |
 
 ![Shoal](output/previews/shoal.jpg)
 ![Isle at sunset](output/previews/isle-sunset.jpg)
 ![Abyss](output/previews/abyss-desktop.jpg)
+![Tide](output/previews/tide-desktop.jpg)
 
 ### Cross-stitch
 
